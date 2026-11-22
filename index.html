@@ -532,6 +532,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 </nav>
 
 <script>
+/* Music state is initialized before any startup code can access it. */
+var nomMusicResults=[];
+var nomMusicAudio=null;
+
 /* NOM SUPABASE CONNECTION */
 /* Share constants must initialize before any startup callbacks can run. */
 const NOM_COMMUNITY_BUCKET="nom-community-media";
@@ -2028,7 +2032,7 @@ function initialiseApp(){
 }
 
 
-let nomMusicResults=[],nomMusicAudio=null;
+
 function toggleNomMusicPanel(force){const panel=document.getElementById("nomMusicPanel"),button=document.getElementById("nomMusicToggle");const open=typeof force==="boolean"?force:panel.classList.contains("closed");panel.classList.toggle("closed",!open);button.classList.toggle("active",open);button.setAttribute("aria-label",open?"Close music":"Open music");}
 function parseNomSpotifyLink(value){
  const raw=String(value||"").trim();if(!raw)return null;
