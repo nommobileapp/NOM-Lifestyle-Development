@@ -1889,7 +1889,7 @@ async function submitAuth(){
         email,
         password,
         options:{
-          emailRedirectTo:"https://nommobileapp.github.io/nom-lifestyle-mockup/",
+          emailRedirectTo:"https://nommobileapp.github.io/NOM-Lifestyle-Development/",
           data:{
             display_name:displayName,
             username:username
@@ -1903,9 +1903,13 @@ async function submitAuth(){
         currentUser = data.user;
         message.textContent = "Account created successfully.";
         updateProfile();
-        await uploadPendingRegistrationAvatar(data.user);
+        try{
+          await uploadPendingRegistrationAvatar(data.user);
+        }catch(avatarError){
+          message.textContent = "Your account was created, but the profile picture could not be saved yet. You can try again after signing in: "+(avatarError.message||"Upload failed.");
+        }
       }else{
-        message.textContent = "Registration received. Please confirm your email. Your selected profile picture will be added when you sign in after confirmation.";
+        message.textContent = "Registration received. Please confirm your email. The confirmation link will return you to NOM, where your account and selected profile picture can finish setting up.";
       }
 
     }else{
@@ -1919,7 +1923,11 @@ async function submitAuth(){
       currentUser = data.user;
       message.textContent = "Login successful.";
       updateProfile();
-      await uploadPendingRegistrationAvatar(data.user);
+      try{
+        await uploadPendingRegistrationAvatar(data.user);
+      }catch(avatarError){
+        message.textContent = "You are signed in, but your profile picture could not be saved yet: "+(avatarError.message||"Upload failed.");
+      }
     }
 
   }catch(error){
@@ -2003,7 +2011,11 @@ function initialiseApp(){
         loadSavedPlacesForUser(eventUser.id);
         startNomNotificationListener();
         if(event==="INITIAL_SESSION"||event==="SIGNED_IN"){
-          uploadPendingRegistrationAvatar(eventUser).catch(error=>console.warn("NOM avatar upload:",error.message));
+          uploadPendingRegistrationAvatar(eventUser).catch(error=>{
+            console.warn("NOM avatar upload:",error.message);
+            const message=document.getElementById("authMessage");
+            if(message)message.textContent="Your account is active, but the profile picture could not be saved yet. You can retry by signing in again: "+(error.message||"Upload failed.");
+          });
         }
       }else{
         resetSavedPlacesForGuest();
