@@ -382,7 +382,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <input id="nomSharePlace" maxlength="160" placeholder="Place name">
     <input id="nomShareLocation" maxlength="200" placeholder="City, island or country">
     <label for="nomShareMedia">Add photos, video or audio</label>
-    <input id="nomShareMedia" type="file" accept="image/*,video/*,audio/*" multiple onchange="previewNomShareMedia()">
+    <input id="nomShareMedia" type="file" accept="image/*,video/*,.mp3,.m4a,.mp4,.aac,.wav,.wave,.caf,.aif,.aiff,.flac,.ogg,.oga,.opus,.amr,.3gp,.mid,.midi" multiple onchange="previewNomShareMedia()">
     <div class="nom-share-preview" id="nomSharePreview"></div>
     <p class="nom-share-hint">Up to 4 files · 50 MB per file. You choose what to share. Posts are published to the NOM community.</p>
     <div class="nom-share-actions">
@@ -1145,8 +1145,10 @@ function selectNomShareType(type){
   const body=document.getElementById("nomShareBody");
   const place=document.getElementById("nomSharePlace");
   const media=document.getElementById("nomShareMedia");
-  const accepts={image:"image/*",video:"video/*",audio:"audio/*"};
-  media.accept=accepts[type]||"image/*,video/*,audio/*";
+  const accepts={image:"image/*",video:"video/*",audio:".mp3,.m4a,.mp4,.aac,.wav,.wave,.caf,.aif,.aiff,.flac,.ogg,.oga,.opus,.amr,.3gp,.mid,.midi,audio/*"};
+  media.accept=accepts[type]||"image/*,video/*,.mp3,.m4a,.mp4,.aac,.wav,.wave,.caf,.aif,.aiff,.flac,.ogg,.oga,.opus,.amr,.3gp,.mid,.midi";
+  const mediaLabel=document.querySelector('label[for="nomShareMedia"]');
+  if(mediaLabel)mediaLabel.textContent=type==="audio"?"Choose an audio file":type==="image"?"Choose photos":type==="video"?"Choose a video":"Add photos, video or audio";
   composer.scrollIntoView({behavior:"smooth",block:"start"});
   if(type==="text"){body.focus();return;}
   if(type==="place"){place.focus();return;}
