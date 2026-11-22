@@ -2024,19 +2024,6 @@ function initialiseApp(){
 
 let nomMusicResults=[],nomMusicAudio=null;
 function toggleNomMusicPanel(force){const panel=document.getElementById("nomMusicPanel"),button=document.getElementById("nomMusicToggle");const open=typeof force==="boolean"?force:panel.classList.contains("closed");panel.classList.toggle("closed",!open);button.classList.toggle("active",open);button.setAttribute("aria-label",open?"Close music":"Open music");}
-async function loadAppleMusicResults(term){
- const endpoint=SUPABASE_URL+"/functions/v1/nom-music-search?q="+encodeURIComponent(term);
- const controller=new AbortController();
- const timeout=setTimeout(()=>controller.abort(),18000);
- try{
-  const response=await fetch(endpoint,{method:"GET",mode:"cors",cache:"no-store",headers:{Accept:"application/json",apikey:SUPABASE_KEY},signal:controller.signal});
-  let data={};try{data=await response.json();}catch(_){throw new Error("NOM music search returned an unreadable response.");}
-  if(!response.ok)throw new Error(data.error||("NOM music search returned HTTP "+response.status));
-  if(!data||!Array.isArray(data.results))throw new Error("NOM music search returned an unexpected response.");
-  return data.results;
- }catch(error){if(error.name==="AbortError")throw new Error("Apple music search timed out.");throw error;}
- finally{clearTimeout(timeout);}
-}
 function parseNomSpotifyLink(value){
  const raw=String(value||"").trim();if(!raw)return null;
  let match=raw.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
