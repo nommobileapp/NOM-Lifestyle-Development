@@ -1141,13 +1141,14 @@ function selectNomShareType(type){
   const body=document.getElementById("nomShareBody");
   const place=document.getElementById("nomSharePlace");
   const media=document.getElementById("nomShareMedia");
-  if(type==="text"){composer.scrollIntoView({behavior:"smooth",block:"start"});body.focus();return;}
-  if(type==="place"){composer.scrollIntoView({behavior:"smooth",block:"start"});place.focus();return;}
   const accepts={image:"image/*",video:"video/*",audio:"audio/*"};
   media.accept=accepts[type]||"image/*,video/*,audio/*";
-  // Open the native iPhone picker directly in the original tap gesture.
-  // Avoid scrollIntoView before input.click(), which can cancel iOS picker activation.
-  media.click();
+  composer.scrollIntoView({behavior:"smooth",block:"start"});
+  if(type==="text"){body.focus();return;}
+  if(type==="place"){place.focus();return;}
+  // On iPhone, let the member tap the visible native file input.
+  // Avoid a scripted input.click(), which Safari may silently block.
+  media.scrollIntoView({behavior:"smooth",block:"center"});
 }
 function showNomShareComposer(){
   if(!currentUser){showPage("profile");showAuth("signup");return;}
