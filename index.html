@@ -1255,19 +1255,29 @@ async function publishNomPost(){
   }
 }
 
-// One publish entry point: immediate visible feedback, then a single upload call.
+// One publish entry point with synchronous entry diagnostics.
 function handleNomPublishTap(event){
   if(event)event.preventDefault();
   const button=document.getElementById("nomSharePublish");
   const status=document.getElementById("nomShareMessage");
   if(!button||button.disabled)return;
-  button.textContent="Starting...";
-  if(status)status.textContent="Tap received — NOM is preparing your post.";
-  Promise.resolve().then(()=>publishNomPost()).catch(error=>{
-    if(status)status.textContent="NOM could not start publishing: "+(error?.message||"Please try again.");
+  button.disabled=true;
+  button.textContent="Checking...";
+  if(status)status.textContent="Publish tap received. Checking your post...";
+  try{
+    const task=publishNomPost();
+    if(task&&typeof task.then==="function")task.catch(error=>{
+      console.error("NOM publish handler:",error);
+      if(status)status.textContent="Publish stopped: "+(error?.message||String(error));
+      button.disabled=false;
+      button.textContent="Publish post";
+    });
+  }catch(error){
+    console.error("NOM publish handler:",error);
+    if(status)status.textContent="Publish could not start: "+(error?.message||String(error));
     button.disabled=false;
     button.textContent="Publish post";
-  });
+  }
 }
 
 function showCommunityComposer(){
