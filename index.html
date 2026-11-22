@@ -357,7 +357,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <button class="secondary" id="importBaliButton" type="button" onclick="importBaliPlaces()">Save up to 100 Bali places to NOM</button>
   </div>
   <div style="display:flex;align-items:center;gap:9px;margin:8px 0 12px">
-    <button class="category active" id="photosOnlyButton" type="button" aria-pressed="true" onclick="togglePhotosOnly()">📷 Photos only: ON</button>
+    <button class="category" id="photosOnlyButton" type="button" aria-pressed="false" onclick="togglePhotosOnly()">📷 Photos only: OFF</button>
   </div>
   <div class="message" id="placesMessage"></div>
   <div class="cards" id="explorePlaces"></div>
@@ -555,7 +555,7 @@ const supabaseClient = window.supabase?.createClient
 let currentUser = null;
 let authMode = "signup";
 let selectedCategory = "All";
-let photosOnly = true;
+let photosOnly = false;
 
 /* PLACES — loaded from the Supabase catalogue */
 let places = [];
