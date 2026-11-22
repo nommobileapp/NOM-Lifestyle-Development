@@ -541,7 +541,15 @@ const SUPABASE_URL = "https://ojzzroswtzjnnoigjpuc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xc8mdZ1eb8XtEyxtn3tfXg_DnqNNfjI";
 
 const supabaseClient = window.supabase?.createClient
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: "nom-lifestyle-auth"
+      }
+    })
   : null;
 
 let currentUser = null;
