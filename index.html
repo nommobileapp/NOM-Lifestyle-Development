@@ -1371,9 +1371,10 @@ async function loadNomPostsFeed(){
       }).join("");
       const place=post.place_name?'<div class="post-meta">📍 '+escapeHTML(post.place_name)+(post.place_location?' · '+escapeHTML(post.place_location):"")+'</div>':"";
       const date=new Date(post.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
-      const ownerActions=currentUser&&currentUser.id===post.user_id?'<div class="nom-post-actions"><button type="button" class="nom-post-delete" onclick="deleteNomPost(\\''+escapeHTML(post.id)+'\\',this)">Delete post</button></div>':"";
+      const ownerActions=currentUser&&currentUser.id===post.user_id?'<div class="nom-post-actions"><button type="button" class="nom-post-delete" data-delete-post="'+escapeHTML(post.id)+'">Delete post</button></div>':"";
       return '<article class="feed-card nom-post-card"><div class="post-author">'+avatar+'<span>'+escapeHTML(username)+'</span><span class="small"> · '+escapeHTML(date)+'</span></div><div class="post-meta">'+escapeHTML(post.category||"General")+' · '+escapeHTML(post.post_type||"text")+'</div>'+(post.body?'<p class="nom-post-body">'+escapeHTML(post.body)+'</p>':"")+place+mediaHtml+ownerActions+'</article>';
     }).join("");
+    feed.querySelectorAll("[data-delete-post]").forEach(button=>button.addEventListener("click",()=>deleteNomPost(button.dataset.deletePost,button)));
   }catch(error){
     console.error("NOM Community feed:",error);
     feed.innerHTML='<p class="small">Cannot access NOM Community right now. Please refresh and try again.</p>';
