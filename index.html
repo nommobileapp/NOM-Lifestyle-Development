@@ -193,7 +193,8 @@ p{color:var(--muted);line-height:1.5}
 .nom-share-preview img,.nom-share-preview video{width:94px;height:94px;object-fit:cover;border-radius:12px;background:#111}
 .nom-share-preview audio{width:220px;max-width:80vw}
 .nom-share-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
-.nom-share-actions button{margin:0}
+.nom-share-actions button{margin:0;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation}
+#nomSharePublish{min-height:48px;min-width:140px;position:relative;z-index:5;pointer-events:auto;touch-action:manipulation}
 .nom-share-hint{font-size:11px;color:var(--muted);line-height:1.5}
 
 .form-card{
@@ -384,7 +385,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <div class="nom-share-preview" id="nomSharePreview"></div>
     <p class="nom-share-hint">Up to 4 files · 50 MB per file. You choose what to share. Posts are published to the NOM community.</p>
     <div class="nom-share-actions">
-      <button class="primary" id="nomSharePublish" type="button" onclick="document.getElementById('nomShareMessage').textContent='Publish button is responding — starting upload...';publishNomPost()">Publish post</button>
+      <button class="primary" id="nomSharePublish" type="button" onclick="handleNomPublishTap(event)">Publish post</button>
       <button class="secondary" type="button" onclick="hideNomShareComposer()">Cancel</button>
     </div>
     <div class="message" id="nomShareMessage" aria-live="polite"></div>
@@ -1254,13 +1255,18 @@ async function publishNomPost(){
   }
 }
 
-// Bind the publish action directly after the composer functions are defined.
-const nomPublishButton=document.getElementById("nomSharePublish");
-if(nomPublishButton){
-  nomPublishButton.addEventListener("click",()=>{
-    const status=document.getElementById("nomShareMessage");
-    if(status)status.textContent="Publish tapped — preparing your post...";
-    publishNomPost();
+// One publish entry point: immediate visible feedback, then a single upload call.
+function handleNomPublishTap(event){
+  if(event)event.preventDefault();
+  const button=document.getElementById("nomSharePublish");
+  const status=document.getElementById("nomShareMessage");
+  if(!button||button.disabled)return;
+  button.textContent="Starting...";
+  if(status)status.textContent="Tap received — NOM is preparing your post.";
+  Promise.resolve().then(()=>publishNomPost()).catch(error=>{
+    if(status)status.textContent="NOM could not start publishing: "+(error?.message||"Please try again.");
+    button.disabled=false;
+    button.textContent="Publish post";
   });
 }
 
