@@ -384,7 +384,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <div class="nom-share-preview" id="nomSharePreview"></div>
     <p class="nom-share-hint">Up to 4 files · 50 MB per file. You choose what to share. Posts are published to the NOM community.</p>
     <div class="nom-share-actions">
-      <button class="primary" id="nomSharePublish" type="button" onclick="publishNomPost()">Publish post</button>
+      <button class="primary" id="nomSharePublish" type="button">Publish post</button>
       <button class="secondary" type="button" onclick="hideNomShareComposer()">Cancel</button>
     </div>
     <div class="message" id="nomShareMessage" aria-live="polite"></div>
@@ -1252,6 +1252,16 @@ async function publishNomPost(){
   }finally{
     button.disabled=false;button.textContent="Publish post";
   }
+}
+
+// Bind the publish action directly after the composer functions are defined.
+const nomPublishButton=document.getElementById("nomSharePublish");
+if(nomPublishButton){
+  nomPublishButton.addEventListener("click",()=>{
+    const status=document.getElementById("nomShareMessage");
+    if(status)status.textContent="Publish tapped — preparing your post...";
+    publishNomPost();
+  });
 }
 
 function showCommunityComposer(){
