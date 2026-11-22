@@ -299,6 +299,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 .nom-post-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:10px 0;color:#f4f4f4}
 .nom-post-media{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:12px;margin:10px 0;background:#080808}
 .nom-post-audio{display:block;width:100%;margin:12px 0}
+.nom-post-actions{display:flex;justify-content:flex-end;margin-top:12px}.nom-post-delete{border:1px solid rgba(255,125,45,.45);background:rgba(255,125,45,.08);color:#ff9a5b;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700}.nom-post-delete:disabled{opacity:.55}
 </style>
 </head>
 
@@ -1303,6 +1304,34 @@ function communityPostCard(post,own=false){
     (own?'<div class="post-status">'+status+'</div>':"")+(mediaCount?'<p class="small">'+photos.length+' photos · '+videos.length+' videos shared</p>':"")+'</article>';
 }
 
+async function deleteNomPost(postId,button){
+  if(!currentUser){alert("Please log in to delete your post.");return;}
+  if(!postId||!window.confirm("Delete this post? This will permanently remove your post and its attached media."))return;
+  if(button){button.disabled=true;button.textContent="Deleting...";}
+  try{
+    const {data:post,error:checkError}=await supabaseClient.from("nom_posts").select("id").eq("id",postId).eq("user_id",currentUser.id).maybeSingle();
+    if(checkError)throw checkError;
+    if(!post)throw new Error("This post is no longer available or does not belong to your account.");
+    const {data:media,error:mediaError}=await supabaseClient.from("nom_post_media").select("storage_path").eq("post_id",postId).eq("user_id",currentUser.id);
+    if(mediaError)throw mediaError;
+    const {data:deleted,error:deleteError}=await supabaseClient.from("nom_posts").delete().eq("id",postId).eq("user_id",currentUser.id).select("id").maybeSingle();
+    if(deleteError)throw deleteError;
+    if(!deleted)throw new Error("NOM could not confirm deletion. Please refresh and try again.");
+    let cleanupWarning="";
+    const paths=(media||[]).map(item=>item.storage_path).filter(Boolean);
+    if(paths.length){
+      const {error:storageError}=await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).remove(paths);
+      if(storageError){console.warn("NOM post media cleanup:",storageError);cleanupWarning=" The post was deleted, but some media files may need cleanup.";}
+    }
+    await loadNomPostsFeed();
+    if(cleanupWarning)alert("Your post was deleted."+cleanupWarning);
+  }catch(error){
+    console.error("NOM post deletion:",error);
+    alert("Could not delete this post: "+(error?.message||"Please try again."));
+    if(button){button.disabled=false;button.textContent="Delete post";}
+  }
+}
+
 async function loadNomPostsFeed(){
   const feed=document.getElementById("nomPostsFeed");
   if(!feed)return;
@@ -1342,7 +1371,8 @@ async function loadNomPostsFeed(){
       }).join("");
       const place=post.place_name?'<div class="post-meta">📍 '+escapeHTML(post.place_name)+(post.place_location?' · '+escapeHTML(post.place_location):"")+'</div>':"";
       const date=new Date(post.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
-      return '<article class="feed-card nom-post-card"><div class="post-author">'+avatar+'<span>'+escapeHTML(username)+'</span><span class="small"> · '+escapeHTML(date)+'</span></div><div class="post-meta">'+escapeHTML(post.category||"General")+' · '+escapeHTML(post.post_type||"text")+'</div>'+(post.body?'<p class="nom-post-body">'+escapeHTML(post.body)+'</p>':"")+place+mediaHtml+'</article>';
+      const ownerActions=currentUser&&currentUser.id===post.user_id?'<div class="nom-post-actions"><button type="button" class="nom-post-delete" onclick="deleteNomPost(\\''+escapeHTML(post.id)+'\\',this)">Delete post</button></div>':"";
+      return '<article class="feed-card nom-post-card"><div class="post-author">'+avatar+'<span>'+escapeHTML(username)+'</span><span class="small"> · '+escapeHTML(date)+'</span></div><div class="post-meta">'+escapeHTML(post.category||"General")+' · '+escapeHTML(post.post_type||"text")+'</div>'+(post.body?'<p class="nom-post-body">'+escapeHTML(post.body)+'</p>':"")+place+mediaHtml+ownerActions+'</article>';
     }).join("");
   }catch(error){
     console.error("NOM Community feed:",error);
