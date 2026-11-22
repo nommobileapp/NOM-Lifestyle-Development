@@ -188,7 +188,7 @@ p{color:var(--muted);line-height:1.5}
 .nom-share-composer textarea{min-height:120px;resize:vertical;line-height:1.5}
 .nom-share-composer label{font-size:12px;color:var(--muted)}
 .nom-share-types{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-.nom-share-types span{font-size:11px;color:var(--lime);background:#252b1b;border:1px solid #414c2a;border-radius:20px;padding:7px 10px}
+.nom-share-types button{font-size:11px;color:var(--lime);background:#252b1b;border:1px solid #414c2a;border-radius:20px;padding:7px 10px}
 .nom-share-preview{display:flex;gap:9px;overflow-x:auto;margin:8px 0 14px}
 .nom-share-preview img,.nom-share-preview video{width:94px;height:94px;object-fit:cover;border-radius:12px;background:#111}
 .nom-share-preview audio{width:220px;max-width:80vw}
@@ -1134,15 +1134,19 @@ async
 const NOM_COMMUNITY_BUCKET="nom-community-media";
 const NOM_COMMUNITY_MAX_FILE=50*1024*1024;
 function selectNomShareType(type){
-  if(!currentUser){showNomShareComposer();return;}
-  showNomShareComposer();
+  if(!currentUser){showPage("profile");showAuth("signup");return;}
+  const composer=document.getElementById("nomShareComposer");
+  composer.classList.remove("hidden");
+  document.getElementById("nomShareMessage").textContent="";
   const body=document.getElementById("nomShareBody");
   const place=document.getElementById("nomSharePlace");
   const media=document.getElementById("nomShareMedia");
-  if(type==="text"){body.focus();return;}
-  if(type==="place"){place.focus();return;}
+  if(type==="text"){composer.scrollIntoView({behavior:"smooth",block:"start"});body.focus();return;}
+  if(type==="place"){composer.scrollIntoView({behavior:"smooth",block:"start"});place.focus();return;}
   const accepts={image:"image/*",video:"video/*",audio:"audio/*"};
   media.accept=accepts[type]||"image/*,video/*,audio/*";
+  // Open the native iPhone picker directly in the original tap gesture.
+  // Avoid scrollIntoView before input.click(), which can cancel iOS picker activation.
   media.click();
 }
 function showNomShareComposer(){
@@ -1194,12 +1198,13 @@ async function publishNomPost(){
   if(!supabaseClient){message.textContent="NOM is temporarily unavailable. Please try again.";return;}
   const progress=document.getElementById("nomShareProgress"),bar=document.getElementById("nomShareProgressBar");
   const uploaded=[];button.disabled=true;button.textContent="Publishing...";progress.classList.remove("hidden");bar.style.width="0%";message.textContent="Preparing your post...";
-  let createdPostId=null;
+  let createdPostId=null,uploadStage="checking your login";
   try{
     const {data:sessionData,error:sessionError}=await supabaseClient.auth.getSession();
     if(sessionError)throw sessionError;
     const session=sessionData?.session;
     if(!session)throw new Error("Your session has expired. Please log in again.");
+    uploadStage="creating your post";
     let postType="text";
     const mediaTypes=new Set(infos.map(info=>info.mediaType));
     if(mediaTypes.size>1||(body&&mediaTypes.size>0))postType="mixed";
@@ -1211,6 +1216,7 @@ async function publishNomPost(){
     const attachments=[];
     for(let i=0;i<files.length;i++){
       const file=files[i],info=infos[i],ext=(file.name.split(".").pop()||"file").toLowerCase().replace(/[^a-z0-9]/g,"")||"bin",path=currentUser.id+"/"+crypto.randomUUID()+"."+ext;
+      uploadStage="uploading "+info.mediaType+" file "+(i+1)+" of "+files.length;
       message.textContent="Uploading "+info.mediaType+" "+(i+1)+" of "+files.length+"...";
       if(file.size>6*1024*1024){
         await uploadNomResumable(file,path,session,NOM_COMMUNITY_BUCKET,pct=>{bar.style.width=pct+"%";message.textContent="Uploading media "+(i+1)+" of "+files.length+" · "+pct+"%";},info.contentType);
@@ -1223,6 +1229,7 @@ async function publishNomPost(){
       bar.style.width=Math.round(((i+1)/Math.max(files.length,1))*100)+"%";
     }
     if(attachments.length){
+      uploadStage="saving the media attachment";
       const {error:mediaError}=await supabaseClient.from("nom_post_media").insert(attachments);
       if(mediaError)throw mediaError;
     }
@@ -1238,7 +1245,8 @@ async function publishNomPost(){
     console.error("NOM post publishing:",error);
     if(createdPostId)await supabaseClient.from("nom_posts").delete().eq("id",createdPostId);
     if(uploaded.length)await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).remove(uploaded);
-    message.textContent=error?.message||"Your post could not be published. Please try again.";
+    const detail=[error?.message,error?.code?"Code: "+error.code:"",error?.details,error?.hint].filter(Boolean).join(" · ");
+    message.textContent="Failed while "+uploadStage+": "+(detail||"Unknown upload error. Please try again.");
     progress.classList.add("hidden");bar.style.width="0%";
   }finally{
     button.disabled=false;button.textContent="Publish post";
