@@ -291,6 +291,12 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 .nom-music-result-info strong{display:block;font-size:13px}
 .nom-music-result-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 @media(min-width:700px){.nom-music-panel{left:auto;right:20px;width:400px}}
+.nom-post-card{margin:14px 0;padding:16px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:rgba(255,255,255,.035)}
+.nom-post-card .post-author{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.nom-post-card .post-meta{font-size:.76rem;color:var(--lime);margin:8px 0}
+.nom-post-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:10px 0;color:#f4f4f4}
+.nom-post-media{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:12px;margin:10px 0;background:#080808}
+.nom-post-audio{display:block;width:100%;margin:12px 0}
 </style>
 </head>
 
@@ -402,6 +408,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <button class="secondary" type="button" onclick="hideCommunityComposer()">Cancel</button>
     <div class="message" id="communityMessage"></div><div class="work-progress hidden" id="communityUploadProgress"><span id="communityUploadProgressBar"></span></div><p class="small">Your place and photos appear publicly in Explore and Community as soon as you share them.</p>
   </div>
+  <h2>Latest from NOM</h2><div id="nomPostsFeed"><p class="small">Loading NOM posts...</p></div>
   <h2>Discoveries from the community</h2><div id="communityFeed"><p class="small">Loading community discoveries...</p></div>
   <h2>Your submissions</h2><div id="myCommunitySubmissions"><p class="small">Log in to see your submissions.</p></div>
   <div class="feed-card nom-work-entry" role="link" tabindex="0" aria-label="Open NOM Work" onclick="showPage('work')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showPage('work')}"><div class="eyebrow">NOM WORK</div><h3>Work. Travel. Live.</h3>
@@ -1163,93 +1170,47 @@ function previewNomShareMedia(){
   });
 }
 async function publishNomPost(){
-  const message=document.getElementById("nomShareMessage");
-  const button=document.getElementById("nomSharePublish");
-  const progress=document.getElementById("nomShareProgress");
-  const bar=document.getElementById("nomShareProgressBar");
-  const body=document.getElementById("nomShareBody").value.trim();
-  const placeName=document.getElementById("nomSharePlace").value.trim();
-  const placeLocation=document.getElementById("nomShareLocation").value.trim();
-  const category=document.getElementById("nomShareCategory").value;
-  const files=Array.from(document.getElementById("nomShareMedia").files||[]);
-  const uploaded=[];
+  const message=document.getElementById("nomShareMessage"),button=document.getElementById("nomSharePublish"),body=document.getElementById("nomShareBody").value.trim(),placeName=document.getElementById("nomSharePlace").value.trim(),placeLocation=document.getElementById("nomShareLocation").value.trim(),category=document.getElementById("nomShareCategory").value,files=Array.from(document.getElementById("nomShareMedia").files||[]);
+  if(!currentUser){message.textContent="Please log in to share with NOM.";return;}
+  if(!body&&!placeName&&!files.length){message.textContent="Add a story, a place or some media before publishing.";return;}
+  if(body.length>3000){message.textContent="Your post is too long. Please keep it under 3,000 characters.";return;}
+  if(files.length>4){message.textContent="Please choose up to 4 files.";return;}
+  const infos=files.map(getNomShareFileInfo);
+  const invalid=files.find((file,index)=>!file.size||file.size>NOM_COMMUNITY_MAX_FILE||!infos[index].supported);
+  if(invalid){message.textContent=invalid.size>NOM_COMMUNITY_MAX_FILE?invalid.name+" exceeds NOM's 50 MB limit.":"Please choose supported JPG, PNG, WebP, MP4, MOV, WebM, MP3, M4A, AAC, WAV or OGG files.";return;}
+  if(!supabaseClient){message.textContent="NOM is temporarily unavailable. Please try again.";return;}
+  const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
+  if(sessionError||!session){message.textContent="Your session has expired. Please log in again.";return;}
+  const progress=document.getElementById("nomShareProgress"),bar=document.getElementById("nomShareProgressBar");
+  const uploaded=[];button.disabled=true;button.textContent="Publishing...";progress.classList.remove("hidden");bar.style.width="0%";message.textContent="Preparing your post...";
   let createdPostId=null;
-  let session=null;
-  let busy=false;
-
-  message.textContent="Checking your NOM account...";
   try{
-    if(!currentUser) throw new Error("Please log in to NOM before publishing.");
-    if(!body&&!placeName&&!files.length) throw new Error("Add a story, a place or some media before publishing.");
-    if(body.length>3000) throw new Error("Your post is too long. Please keep it under 3,000 characters.");
-    if(files.length>4) throw new Error("Please choose up to 4 files.");
-    const infos=files.map(getNomShareFileInfo);
-    const invalid=files.find((file,index)=>!file.size||file.size>NOM_COMMUNITY_MAX_FILE||!infos[index].supported);
-    if(invalid) throw new Error(invalid.size>NOM_COMMUNITY_MAX_FILE?invalid.name+" exceeds NOM's 50 MB limit.":"Please choose supported JPG, PNG, WebP, MP4, MOV, WebM, MP3, M4A, AAC, WAV or OGG files.");
-    if(!supabaseClient) throw new Error("NOM is temporarily unavailable. Please refresh and try again.");
-
-    const sessionResult=await supabaseClient.auth.getSession();
-    if(sessionResult.error) throw sessionResult.error;
-    session=sessionResult.data?.session;
-    if(!session) throw new Error("Your session has expired. Please log in again.");
-
-    busy=true;
-    button.disabled=true;
-    button.textContent="Publishing...";
-    progress.classList.remove("hidden");
-    bar.style.width="0%";
-    message.textContent="Preparing your post...";
-
     let postType="text";
     const mediaTypes=new Set(infos.map(info=>info.mediaType));
-    if(mediaTypes.size>1||(body&&mediaTypes.size>0)) postType="mixed";
-    else if(mediaTypes.size===1){
-      const onlyType=Array.from(mediaTypes)[0];
-      postType=onlyType==="image"?"photo":onlyType;
-    }
-    const insertPayload={
-      user_id:currentUser.id,
-      body:body||(files.length?"Shared a moment on NOM.":placeName?"Shared a place: "+placeName:""),
-      post_type:postType,
-      place_name:placeName||null,
-      place_location:placeLocation||null,
-      category,
-      status:"published"
-    };
+    if(mediaTypes.size>1||(body&&mediaTypes.size>0))postType="mixed";
+    else if(mediaTypes.size===1){const onlyType=Array.from(mediaTypes)[0];postType=onlyType==="image"?"photo":onlyType;}
+    const insertPayload={user_id:currentUser.id,body:body||(files.length?"Shared a moment on NOM.":null),post_type:postType,place_name:placeName||null,place_location:placeLocation||null,category,status:"published"};
     const {data:post,error:postError}=await supabaseClient.from("nom_posts").insert(insertPayload).select("id").single();
-    if(postError) throw postError;
+    if(postError)throw postError;
     createdPostId=post.id;
-
     const attachments=[];
     for(let i=0;i<files.length;i++){
-      const file=files[i],info=infos[i];
-      const ext=(file.name.split(".").pop()||"file").toLowerCase().replace(/[^a-z0-9]/g,"")||"bin";
-      const path=currentUser.id+"/"+crypto.randomUUID()+"."+ext;
+      const file=files[i],info=infos[i],ext=(file.name.split(".").pop()||"file").toLowerCase().replace(/[^a-z0-9]/g,"")||"bin",path=currentUser.id+"/"+crypto.randomUUID()+"."+ext;
       message.textContent="Uploading "+info.mediaType+" "+(i+1)+" of "+files.length+"...";
       if(file.size>6*1024*1024){
-        await uploadNomResumable(file,path,session,NOM_COMMUNITY_BUCKET,pct=>{
-          bar.style.width=pct+"%";
-          message.textContent="Uploading media "+(i+1)+" of "+files.length+" · "+pct+"%";
-        },info.contentType);
+        await uploadNomResumable(file,path,session,NOM_COMMUNITY_BUCKET,pct=>{bar.style.width=pct+"%";message.textContent="Uploading media "+(i+1)+" of "+files.length+" · "+pct+"%";},info.contentType);
       }else{
-        const {error:uploadError}=await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).upload(path,file,{
-          cacheControl:"3600",upsert:false,contentType:info.contentType
-        });
-        if(uploadError) throw uploadError;
+        const {error:uploadError}=await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).upload(path,file,{cacheControl:"3600",upsert:false,contentType:info.contentType});
+        if(uploadError)throw uploadError;
       }
       uploaded.push(path);
-      attachments.push({
-        post_id:createdPostId,user_id:currentUser.id,storage_path:path,
-        media_type:info.mediaType,mime_type:info.contentType
-      });
+      attachments.push({post_id:createdPostId,user_id:currentUser.id,storage_path:path,media_type:info.mediaType,mime_type:info.contentType});
       bar.style.width=Math.round(((i+1)/Math.max(files.length,1))*100)+"%";
     }
-
     if(attachments.length){
       const {error:mediaError}=await supabaseClient.from("nom_post_media").insert(attachments);
-      if(mediaError) throw mediaError;
+      if(mediaError)throw mediaError;
     }
-
     document.getElementById("nomShareBody").value="";
     document.getElementById("nomSharePlace").value="";
     document.getElementById("nomShareLocation").value="";
@@ -1257,25 +1218,15 @@ async function publishNomPost(){
     document.getElementById("nomSharePreview").innerHTML="";
     message.textContent="Your post is published. Welcome to the next chapter of NOM.";
     bar.style.width="100%";
-    if(typeof loadNomCommunityFeed==="function") await loadNomCommunityFeed();
+    await loadNomPostsFeed();
   }catch(error){
     console.error("NOM post publishing:",error);
-    if(createdPostId&&supabaseClient){
-      const {error:cleanupError}=await supabaseClient.from("nom_posts").delete().eq("id",createdPostId);
-      if(cleanupError) console.error("NOM post cleanup:",cleanupError);
-    }
-    if(uploaded.length&&supabaseClient){
-      const {error:cleanupError}=await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).remove(uploaded);
-      if(cleanupError) console.error("NOM media cleanup:",cleanupError);
-    }
+    if(createdPostId)await supabaseClient.from("nom_posts").delete().eq("id",createdPostId);
+    if(uploaded.length)await supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).remove(uploaded);
     message.textContent=error?.message||"Your post could not be published. Please try again.";
-    progress.classList.add("hidden");
-    bar.style.width="0%";
+    progress.classList.add("hidden");bar.style.width="0%";
   }finally{
-    if(busy){
-      button.disabled=false;
-      button.textContent="Publish post";
-    }
+    button.disabled=false;button.textContent="Publish post";
   }
 }
 
@@ -1298,6 +1249,42 @@ function communityPostCard(post,own=false){
     '<h3>'+escapeHTML(post.title)+'</h3><p>'+escapeHTML(post.description)+'</p>'+
     '<div class="post-author">Shared by '+authorIdentity+'</div>'+
     (own?'<div class="post-status">'+status+'</div>':"")+(mediaCount?'<p class="small">'+photos.length+' photos · '+videos.length+' videos shared</p>':"")+'</article>';
+}
+
+async function loadNomPostsFeed(){
+  const feed=document.getElementById("nomPostsFeed");
+  if(!feed||!supabaseClient)return;
+  const {data:posts,error}=await supabaseClient.from("nom_posts")
+    .select("id,user_id,body,post_type,place_name,place_location,category,created_at")
+    .eq("status","published").order("created_at",{ascending:false}).limit(40);
+  if(error){console.error("NOM feed:",error);feed.innerHTML='<p class="small">NOM posts are temporarily unavailable. Please refresh and try again.</p>';return;}
+  if(!posts?.length){feed.innerHTML='<p class="small">No moments shared yet. Be the first to post to NOM.</p>';return;}
+  const ids=posts.map(post=>post.id),userIds=[...new Set(posts.map(post=>post.user_id))];
+  const [{data:media,error:mediaError},{data:profiles}] = await Promise.all([
+    supabaseClient.from("nom_post_media").select("post_id,storage_path,media_type,mime_type").in("post_id",ids).order("created_at",{ascending:true}),
+    supabaseClient.from("profiles").select("id,username,display_name,avatar_url").in("id",userIds)
+  ]);
+  if(mediaError)console.error("NOM post media:",mediaError);
+  const profileMap=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
+  const mediaMap={};
+  (media||[]).forEach(item=>{
+    if(!mediaMap[item.post_id])mediaMap[item.post_id]=[];
+    const url=supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).getPublicUrl(item.storage_path).data.publicUrl;
+    mediaMap[item.post_id].push({...item,url});
+  });
+  feed.innerHTML=posts.map(post=>{
+    const profile=profileMap[post.user_id]||{},username=profile.username||profile.display_name||"NOM member";
+    const avatar=nomAvatarMarkup(profile.avatar_url||"",username,true);
+    const mediaHtml=(mediaMap[post.id]||[]).map(item=>{
+      if(item.media_type==="image")return '<img class="nom-post-media" src="'+escapeHTML(item.url)+'" alt="Photo shared on NOM" loading="lazy">';
+      if(item.media_type==="video")return '<video class="nom-post-media" controls playsinline preload="metadata" src="'+escapeHTML(item.url)+'"></video>';
+      if(item.media_type==="audio")return '<audio class="nom-post-audio" controls preload="metadata" src="'+escapeHTML(item.url)+'"></audio>';
+      return "";
+    }).join("");
+    const place=post.place_name?'<div class="post-meta">📍 '+escapeHTML(post.place_name)+(post.place_location?' · '+escapeHTML(post.place_location):"")+'</div>':"";
+    const date=new Date(post.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+    return '<article class="feed-card nom-post-card"><div class="post-author">'+avatar+'<span>'+escapeHTML(username)+'</span><span class="small"> · '+escapeHTML(date)+'</span></div><div class="post-meta">'+escapeHTML(post.category||"General")+' · '+escapeHTML(post.post_type||"text")+'</div>'+(post.body?'<p class="nom-post-body">'+escapeHTML(post.body)+'</p>':"")+place+mediaHtml+'</article>';
+  }).join("");
 }
 
 async function loadCommunityFeed(){
