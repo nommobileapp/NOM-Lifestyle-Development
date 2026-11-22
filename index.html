@@ -534,7 +534,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 /* NOM SUPABASE CONNECTION */
 /* Share constants must initialize before any startup callbacks can run. */
 const NOM_COMMUNITY_BUCKET="nom-community-media";
-const NOM_COMMUNITY_MAX_FILE=50*1024*1024;
+window.NOM_COMMUNITY_MAX_FILE=50*1024*1024;
 
 const SUPABASE_URL = "https://ojzzroswtzjnnoigjpuc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xc8mdZ1eb8XtEyxtn3tfXg_DnqNNfjI";
@@ -1197,7 +1197,7 @@ async function publishNomPost(){
   if(body.length>3000){message.textContent="Your post is too long. Please keep it under 3,000 characters.";return;}
   if(files.length>4){message.textContent="Please choose up to 4 files.";return;}
   const infos=files.map(getNomShareFileInfo);
-  const invalid=files.find((file,index)=>!file.size||file.size>NOM_COMMUNITY_MAX_FILE||!infos[index].supported);
+  const invalid=files.find((file,index)=>!file.size||file.size>window.NOM_COMMUNITY_MAX_FILE||!infos[index].supported);
   if(invalid){message.textContent=invalid.size>NOM_COMMUNITY_MAX_FILE?invalid.name+" exceeds NOM's 50 MB limit.":"Please choose a supported photo, video or audio file. iPhone HEIC/HEIF photos are supported.";return;}
   if(!supabaseClient){message.textContent="NOM is temporarily unavailable. Please try again.";return;}
   const progress=document.getElementById("nomShareProgress"),bar=document.getElementById("nomShareProgressBar");
