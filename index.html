@@ -1973,8 +1973,8 @@ async function logout(){
 }
 
 /* RESTORE LOGIN SESSION
-   Subscribe immediately and use Supabase's INITIAL_SESSION event.
-   This avoids a getSession()/listener timing gap during page startup. */
+   Keep the auth callback synchronous. Defer database and realtime work
+   until after Supabase has finished processing the session event. */
 function initialiseApp(){
   if(!supabaseClient){
     console.error("NOM: Supabase SDK did not load; public navigation remains available.");
@@ -1982,18 +1982,24 @@ function initialiseApp(){
   }
 
   supabaseClient.auth.onAuthStateChange((event,session)=>{
-    if(event==="INITIAL_SESSION"||event==="SIGNED_IN"||event==="SIGNED_OUT"||event==="TOKEN_REFRESHED"||event==="USER_UPDATED"||event==="PASSWORD_RECOVERY"){
-      const previousUserId=currentUser?.id||null;
-      currentUser=session?.user||null;
-      const nextUserId=currentUser?.id||null;
+    if(!["INITIAL_SESSION","SIGNED_IN","SIGNED_OUT","TOKEN_REFRESHED","USER_UPDATED","PASSWORD_RECOVERY"].includes(event))return;
 
-      updateProfile();
+    const previousUserId=currentUser?.id||null;
+    const eventUser=session?.user||null;
+    currentUser=eventUser;
+    const nextUserId=eventUser?.id||null;
 
-      if(currentUser){
-        loadSavedPlacesForUser(currentUser.id);
+    updateProfile();
+
+    setTimeout(()=>{
+      /* Ignore stale queued work if another auth event has since changed user. */
+      if((currentUser?.id||null)!==nextUserId)return;
+
+      if(eventUser){
+        loadSavedPlacesForUser(eventUser.id);
         startNomNotificationListener();
         if(event==="INITIAL_SESSION"||event==="SIGNED_IN"){
-          setTimeout(()=>uploadPendingRegistrationAvatar(currentUser).catch(error=>console.warn("NOM avatar upload:",error.message)),0);
+          uploadPendingRegistrationAvatar(eventUser).catch(error=>console.warn("NOM avatar upload:",error.message));
         }
       }else{
         resetSavedPlacesForGuest();
@@ -2009,15 +2015,15 @@ function initialiseApp(){
         if(publicPanel)publicPanel.classList.add("hidden");
         if(publicContent)publicContent.innerHTML="";
         const workPage=document.getElementById("workPage");
-        if(currentUser&&workPage&&!workPage.classList.contains("hidden"))openWork();
-        else if(!currentUser){
+        if(eventUser&&workPage&&!workPage.classList.contains("hidden"))openWork();
+        else if(!eventUser){
           document.getElementById("workMemberGate")?.classList.remove("hidden");
           document.getElementById("workMemberTools")?.classList.add("hidden");
           const directory=document.getElementById("workDirectory");
           if(directory)directory.innerHTML='<p class="small">Join NOM or log in to discover member portfolios.</p>';
         }
       }
-    }
+    },0);
   });
 }
 
