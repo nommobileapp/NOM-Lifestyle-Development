@@ -532,6 +532,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 
 <script>
 /* NOM SUPABASE CONNECTION */
+/* Share constants must initialize before any startup callbacks can run. */
+const NOM_COMMUNITY_BUCKET="nom-community-media";
+const NOM_COMMUNITY_MAX_FILE=50*1024*1024;
+
 const SUPABASE_URL = "https://ojzzroswtzjnnoigjpuc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xc8mdZ1eb8XtEyxtn3tfXg_DnqNNfjI";
 
@@ -1132,8 +1136,6 @@ async function importBaliPlaces(){
 
 async 
 /* UNIVERSAL SHARE TO NOM — writes to the new nom_posts system */
-const NOM_COMMUNITY_BUCKET="nom-community-media";
-const NOM_COMMUNITY_MAX_FILE=50*1024*1024;
 function selectNomShareType(type){
   if(!currentUser){showPage("profile");showAuth("signup");return;}
   const composer=document.getElementById("nomShareComposer");
