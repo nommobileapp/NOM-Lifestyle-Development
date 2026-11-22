@@ -1972,40 +1972,35 @@ async function logout(){
   }
 }
 
-/* RESTORE LOGIN SESSION */
-async function initialiseApp(){
+/* RESTORE LOGIN SESSION
+   Subscribe immediately and use Supabase's INITIAL_SESSION event.
+   This avoids a getSession()/listener timing gap during page startup. */
+function initialiseApp(){
   if(!supabaseClient){
     console.error("NOM: Supabase SDK did not load; public navigation remains available.");
     return;
   }
-  try{
-    const {data,error} = await supabaseClient.auth.getSession();
-    if(error) throw error;
 
-    currentUser = data.session ? data.session.user : null;
-    updateProfile();
-    if(currentUser){
-      startNomNotificationListener();
-      uploadPendingRegistrationAvatar(currentUser).catch(error=>console.warn("NOM avatar upload:",error.message));
-      loadSavedPlacesForUser(currentUser.id);
-    }else{
-      resetSavedPlacesForGuest();
-    }
-
-    supabaseClient.auth.onAuthStateChange((_event,session)=>{
+  supabaseClient.auth.onAuthStateChange((event,session)=>{
+    if(event==="INITIAL_SESSION"||event==="SIGNED_IN"||event==="SIGNED_OUT"||event==="TOKEN_REFRESHED"||event==="USER_UPDATED"||event==="PASSWORD_RECOVERY"){
       const previousUserId=currentUser?.id||null;
-      currentUser = session ? session.user : null;
+      currentUser=session?.user||null;
       const nextUserId=currentUser?.id||null;
+
       updateProfile();
+
       if(currentUser){
         loadSavedPlacesForUser(currentUser.id);
         startNomNotificationListener();
-        setTimeout(()=>uploadPendingRegistrationAvatar(currentUser).catch(error=>console.warn("NOM avatar upload:",error.message)),0);
+        if(event==="INITIAL_SESSION"||event==="SIGNED_IN"){
+          setTimeout(()=>uploadPendingRegistrationAvatar(currentUser).catch(error=>console.warn("NOM avatar upload:",error.message)),0);
+        }
       }else{
         resetSavedPlacesForGuest();
         if(nomNotificationChannel){supabaseClient.removeChannel(nomNotificationChannel);nomNotificationChannel=null;}
         renderNomUnreadBadges(0);
       }
+
       if(previousUserId!==nextUserId){
         const ownMedia=document.getElementById("workPortfolioMedia");
         const publicPanel=document.getElementById("workPublicPortfolio");
@@ -2022,11 +2017,8 @@ async function initialiseApp(){
           if(directory)directory.innerHTML='<p class="small">Join NOM or log in to discover member portfolios.</p>';
         }
       }
-    });
-
-  }catch(error){
-    console.error("NOM authentication:",error.message);
-  }
+    }
+  });
 }
 
 
