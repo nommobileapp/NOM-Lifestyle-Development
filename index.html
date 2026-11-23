@@ -919,7 +919,7 @@ async function loadNomPlaces(query,category){
     try{
       const {data,error}=await supabaseClient.rpc("search_places",{
         search_text:query,
-        category_filter:category
+        category_filter:(!category || category==="All") ? null : category
       });
       if(!error && Array.isArray(data) && data.length)return data;
       if(error)console.warn("NOM RPC search unavailable; using direct catalogue fallback:",error.message);
@@ -992,7 +992,9 @@ async function searchPlaces(query){
       : "Loading live discoveries...";
 
     try{
-      const url = SUPABASE_URL + "/functions/v1/nom-place-search?q=" + encodeURIComponent(value) + "&category=" + encodeURIComponent(selectedCategory) + "&limit=30";
+      const liveParams = new URLSearchParams({q:value,limit:"30"});
+      if(categoryAtRequest && categoryAtRequest!=="All")liveParams.set("category",categoryAtRequest);
+      const url = SUPABASE_URL + "/functions/v1/nom-place-search?" + liveParams.toString();
       const response = await fetch(url,{headers:{apikey:SUPABASE_KEY}});
       if(!response.ok) throw new Error("External place search unavailable");
       const payload = await response.json();
