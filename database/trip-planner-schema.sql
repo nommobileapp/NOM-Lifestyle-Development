@@ -49,7 +49,6 @@ create table if not exists public.trip_expenses (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid not null,
   owner_id uuid not null references auth.users(id) on delete cascade,
-  item_id uuid,
   category text not null default 'other' check (category in ('flight','accommodation','food','transport','activities','shopping','other')),
   description text not null check (char_length(trim(description)) between 1 and 160),
   amount numeric(12,2) not null check (amount >= 0),
@@ -57,9 +56,7 @@ create table if not exists public.trip_expenses (
   expense_date date not null default current_date,
   created_at timestamptz not null default now(),
   constraint trip_expenses_trip_owner_fkey foreign key (trip_id, owner_id)
-    references public.trips(id, owner_id) on delete cascade,
-  constraint trip_expenses_item_trip_fkey foreign key (item_id, trip_id, owner_id)
-    references public.trip_items(id, trip_id, owner_id) on delete set null
+    references public.trips(id, owner_id) on delete cascade
 );
 
 create index if not exists trips_owner_created_idx on public.trips(owner_id, created_at desc);
