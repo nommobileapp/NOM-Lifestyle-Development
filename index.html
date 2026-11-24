@@ -1751,9 +1751,10 @@ async function openNomTrip(id){
 
 function nomTripSavedPlaceRows(){
  return (savedPlaceRecords||[]).map(row=>{
-  const p=row?.place_data||{},coords=p.coordinates||p.geometry?.coordinates||[];
-  const lat=Number(p.latitude??p.lat??p.location?.lat??p.geometry?.location?.lat??(Array.isArray(coords)?coords[1]:null));
-  const lng=Number(p.longitude??p.lng??p.lon??p.location?.lng??p.geometry?.location?.lng??(Array.isArray(coords)?coords[0]:null));
+  const p=row?.place_data||{},coords=p.geometry?.coordinates||[];
+  const rawLat=p.latitude??p.lat??p.coordinates?.lat??p.location?.lat??p.geometry?.location?.lat??(Array.isArray(coords)?coords[1]:null);
+  const rawLng=p.longitude??p.lng??p.lon??p.coordinates?.lng??p.coordinates?.lon??p.location?.lng??p.geometry?.location?.lng??(Array.isArray(coords)?coords[0]:null);
+  const lat=rawLat===null||rawLat===""?NaN:Number(rawLat),lng=rawLng===null||rawLng===""?NaN:Number(rawLng);
   return {place_key:String(row.place_key||p.id||""),name:String(p.name||p.title||"Saved place"),category:String(p.category||p.type||p.place_type||"place"),address:String(p.address||p.location_name||p.vicinity||p.formatted_address||p.area||""),latitude:Number.isFinite(lat)&&Math.abs(lat)<=90?lat:null,longitude:Number.isFinite(lng)&&Math.abs(lng)<=180?lng:null,description:String(p.description||"").slice(0,260)};
  }).filter(p=>p.place_key&&p.name).slice(0,40);
 }
@@ -1768,7 +1769,7 @@ async function generateNomTripSuggestions(tripId){
  button.disabled=true;button.textContent="✨ Planning nearby stops…";status.textContent="Checking your saved places and their locations…";results.innerHTML="";
  try{
   await loadSavedPlacesForUser(currentUser.id,true);
-  const placesForAI=nomTripSavedPlaceRows();
+  if(savedPlacesError)throw new Error(savedPlacesError);\n  const placesForAI=nomTripSavedPlaceRows();
   if(!placesForAI.length)throw new Error("Save a few places first, then NOM can build a route from them.");
   const {data,error}=await supabaseClient.functions.invoke("nom-trip-suggestions",{body:{destination:trip.destination,start_date:trip.start_date,end_date:trip.end_date,saved_places:placesForAI,existing_items:nomTripItemsCache.map(x=>({date:x.day_date,title:x.title,location:x.location,time:x.start_time})).slice(0,30)}});
   if(error)throw error;
