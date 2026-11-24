@@ -496,7 +496,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <p class="small">Your NOM account</p>
     <div class="avatar-upload">
       <label for="existingAvatarFile">Change profile picture</label>
-      <input id="existingAvatarFile" type="file" accept="image/*" aria-label="Choose a new profile picture">
+      <input id="existingAvatarFile" type="file" accept="image/*" aria-label="Choose a new profile picture" onchange="window.previewExistingAvatar(this)" oninput="window.previewExistingAvatar(this)">
       <img id="existingAvatarPreview" class="avatar-preview hidden" alt="New profile picture preview">
       <button class="primary hidden" id="saveExistingAvatar" type="button" onclick="saveExistingAvatar()">Save profile picture</button>
       <div class="message" id="existingAvatarMessage"></div>
@@ -2103,15 +2103,22 @@ function playNomMusicPreview(index){
 }
 /* AVATAR PICKER — bind directly after the page elements exist.
    Avoid relying on inline file-input handlers in mobile Safari. */
-const existingAvatarInput=document.getElementById("existingAvatarFile");
-if(existingAvatarInput){
-  existingAvatarInput.addEventListener("change",()=>{
-    previewExistingAvatar(existingAvatarInput).catch(error=>{
+window.previewExistingAvatar=previewExistingAvatar;
+document.addEventListener("change",(event)=>{
+  const input=event.target;
+  if(input&&input.id==="existingAvatarFile"){
+    previewExistingAvatar(input).catch(error=>{
       const message=document.getElementById("existingAvatarMessage");
       if(message)message.textContent=error.message||"Could not prepare that image.";
     });
+  }
+},true);
+const existingAvatarInput=document.getElementById("existingAvatarFile");
+if(existingAvatarInput){
+  existingAvatarInput.addEventListener("click",()=>{
+    const message=document.getElementById("existingAvatarMessage");
+    if(message)message.textContent="Choose a photo from your iPhone to preview it here.";
   });
-  window.previewExistingAvatar=previewExistingAvatar;
 }
 
 document.getElementById("homePlaces").innerHTML = '<p class="small">Loading places from NOM...</p>';
