@@ -1305,8 +1305,8 @@ function handleNomPublishTap(event){
   const button=document.getElementById("nomSharePublish");
   const status=document.getElementById("nomShareMessage");
   if(!button||button.disabled)return;
-  button.disabled=true;
-  button.textContent="Checking...";
+  // Let publishNomPost own the disabled state after preflight validation.
+  // Early validation returns must leave the button usable (e.g. unsupported iPhone video MIME).
   if(status)status.textContent="Publish tap received. Checking your post...";
   try{
     const task=publishNomPost();
