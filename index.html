@@ -326,10 +326,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
   <input class="search" id="homeSearch" placeholder="Search places, members, community, work..." oninput="searchNOM(this.value,'home')"><div class="nom-universal-search hidden" id="homeUniversalSearch"><div class="nom-search-tabs" id="homeSearchTabs"></div><div id="homeSearchResults" aria-live="polite"><div class="nom-search-hint">Search across NOM.</div></div></div>
   <div class="categories">
     <button class="category active" onclick="filterPlaces('All',this)">All</button>
+    <button class="category" onclick="filterPlaces('Places',this)">Places</button>
     <button class="category" onclick="filterPlaces('Nature',this)">Nature</button>
-    <button class="category" onclick="filterPlaces('Food',this)">Food</button>
-    <button class="category" onclick="filterPlaces('Beach',this)">Beach</button>
-    <button class="category" onclick="filterPlaces('Culture',this)">Culture</button>
+    <button class="category" onclick="filterPlaces('Community',this)">Community</button>
+    <button class="category" onclick="filterPlaces('Culture &amp; Lifestyle',this)">Culture &amp; Lifestyle</button>
   </div>
   <div class="cards" id="homePlaces"></div>
 
@@ -348,10 +348,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
   <input class="search" id="exploreSearch" placeholder="Search places, members, community, work..." oninput="searchNOM(this.value,'explore')"><div class="nom-universal-search hidden" id="exploreUniversalSearch"><div class="nom-search-tabs" id="exploreSearchTabs"></div><div id="exploreSearchResults" aria-live="polite"><div class="nom-search-hint">Search across NOM.</div></div></div>
   <div class="categories">
     <button class="category active" onclick="filterPlaces('All',this)">All</button>
+    <button class="category" onclick="filterPlaces('Places',this)">Places</button>
     <button class="category" onclick="filterPlaces('Nature',this)">Nature</button>
-    <button class="category" onclick="filterPlaces('Food',this)">Food</button>
-    <button class="category" onclick="filterPlaces('Beach',this)">Beach</button>
-    <button class="category" onclick="filterPlaces('Culture',this)">Culture</button>
+    <button class="category" onclick="filterPlaces('Community',this)">Community</button>
+    <button class="category" onclick="filterPlaces('Culture &amp; Lifestyle',this)">Culture &amp; Lifestyle</button>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0">
     <button class="secondary" id="importBaliButton" type="button" onclick="importBaliPlaces()">Save up to 100 Bali places to NOM</button>
@@ -377,7 +377,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <label for="nomShareBody">Your story</label>
     <textarea id="nomShareBody" maxlength="3000" placeholder="Share what's on your mind..."></textarea>
     <label for="nomShareCategory">Category</label>
-    <select id="nomShareCategory"><option>General</option><option>Travel</option><option>Food</option><option>Music</option><option>Work</option><option>Lifestyle</option></select>
+    <select id="nomShareCategory"><option value="Places">Places</option><option value="Nature">Nature</option><option value="Community">Community</option><option value="Culture &amp; Lifestyle">Culture &amp; Lifestyle</option></select>
     <label for="nomSharePlace">Add a place (optional)</label>
     <input id="nomSharePlace" maxlength="160" placeholder="Place name">
     <input id="nomShareLocation" maxlength="200" placeholder="City, island or country">
@@ -396,7 +396,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <h2>Share a place</h2><p class="small">Upload up to 4 photos and/or videos (JPG, PNG, WebP, MP4, MOV or WebM · max 50 MB per file).</p>
     <label for="communityTitle">Place name</label><input id="communityTitle" maxlength="100" placeholder="e.g. A hidden beach in Bali">
     <label for="communityLocation">Location</label><input id="communityLocation" maxlength="160" placeholder="Town, island or country">
-    <label for="communityCategory">Category</label><select id="communityCategory"><option>Nature</option><option>Food</option><option>Beach</option><option>Culture</option><option>Stay</option><option>Experience</option></select>
+    <label for="communityCategory">Category</label><select id="communityCategory"><option value="Places">Places</option><option value="Nature">Nature</option><option value="Community">Community</option><option value="Culture &amp; Lifestyle">Culture &amp; Lifestyle</option></select>
     <label for="communityDescription">Your story / description</label><textarea id="communityDescription" rows="4" maxlength="1200" placeholder="What makes this place worth discovering?"></textarea>
     <button class="secondary" type="button" id="communityAiEnhance" onclick="enhanceCommunityDescription()">✨ Enhance with NOM AI</button>
     <div class="message" id="communityAiMessage" aria-live="polite"></div>
@@ -854,7 +854,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')closePlaceDe
 
 function placeCard(place){
   const isSaved = savedIds.map(String).includes(String(place.id));
-  nomDetailItems[String(place.id)]={id:place.id,kind:'place',name:place.name,description:place.description,location:place.location,address:place.address,category:place.category,price:place.price,rating:place.rating,photos:[place.image_url||place.image].filter(Boolean),videos:place.video_urls||[],author:place.community_author,attribution:place.image_attribution,license:place.image_license};
+  nomDetailItems[String(place.id)]={id:place.id,kind:String(place.id).startsWith('nompost-')?'community-post':'place',name:place.name,description:place.description,location:place.location,address:place.address,category:place.category,price:place.price,rating:place.rating,photos:[place.image_url||place.image].filter(Boolean),videos:place.video_urls||[],author:place.community_author,attribution:place.image_attribution,license:place.image_license};
   const image = place.image_url || place.image || "";
   const rating = place.rating ? "★ " + place.rating : "";
   const photoCredit = place.image_attribution
@@ -966,6 +966,42 @@ async function loadNomPlaces(query,category){
   return await fetchNomPlacesFallback(query,category);
 }
 
+async function loadNomShareCategoryCards(category="All",query=""){
+  if(!supabaseClient)return [];
+  let request=supabaseClient.from("nom_posts")
+    .select("id,body,post_type,place_name,place_location,category,user_id,created_at")
+    .eq("status","published").order("created_at",{ascending:false}).limit(100);
+  if(category&&category!=="All")request=request.eq("category",category);
+  const {data:posts,error}=await request;
+  if(error)throw error;
+  const term=String(query||"").trim().toLowerCase();
+  const filtered=(posts||[]).filter(post=>!term||
+    [post.body,post.place_name,post.place_location].some(value=>String(value||"").toLowerCase().includes(term)));
+  if(!filtered.length)return [];
+  const ids=filtered.map(post=>post.id);
+  const {data:media,error:mediaError}=await supabaseClient.from("nom_post_media")
+    .select("post_id,storage_path,media_type").in("post_id",ids).order("created_at",{ascending:true});
+  if(mediaError)console.warn("NOM Share media lookup:",mediaError.message);
+  const mediaByPost=new Map();
+  (media||[]).forEach(item=>{
+    const url=supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).getPublicUrl(item.storage_path).data.publicUrl;
+    const group=mediaByPost.get(item.post_id)||{photos:[],videos:[]};
+    if(item.media_type==="image")group.photos.push(url);
+    if(item.media_type==="video")group.videos.push(url);
+    mediaByPost.set(item.post_id,group);
+  });
+  return filtered.map(post=>{
+    const mediaGroup=mediaByPost.get(post.id)||{photos:[],videos:[]};
+    const name=post.place_name||String(post.body||"").trim().slice(0,72)||"NOM community post";
+    return {
+      id:"nompost-"+post.id,source_id:"nompost-"+post.id,name,
+      description:post.body||"Shared with NOM",location:post.place_location||"",
+      category:post.category,image_url:mediaGroup.photos[0]||null,image:mediaGroup.photos[0]||null,
+      video_urls:mediaGroup.videos,community_author:"NOM member",rating:null,price:null
+    };
+  });
+}
+
 let searchDebounce;
 async function searchPlaces(query){
   clearTimeout(searchDebounce);
@@ -975,19 +1011,22 @@ async function searchPlaces(query){
   searchDebounce = setTimeout(async ()=>{
     // Render NOM's own catalogue first; third-party search must not block cards.
     const categoryAtRequest=selectedCategory;
-    const [localResult, communityResult] = await Promise.all([
+    const [localResult, communityResult, shareResult] = await Promise.all([
       loadNomPlaces(value,categoryAtRequest)
         .then(data=>({data,error:null}))
         .catch(error=>({data:[],error})),
       supabaseClient
         ? supabaseClient.from("community_posts").select("id,title,description,location,category,photo_urls,video_urls,user_id,username,display_name").eq("status","published").limit(50)
             .then(result=>result).catch(error=>({data:[],error}))
-        : Promise.resolve({data:[],error:new Error("Supabase client unavailable")})
+        : Promise.resolve({data:[],error:new Error("Supabase client unavailable")}),
+      loadNomShareCategoryCards(categoryAtRequest,value)
+        .then(data=>({data,error:null})).catch(error=>({data:[],error}))
     ]);
 
     if(requestId !== searchRequestId) return;
     if(localResult.error) console.error("NOM catalogue search:",localResult.error.message);
     if(communityResult.error) console.warn("NOM community search:",communityResult.error.message);
+    if(shareResult.error) console.warn("NOM Share category search:",shareResult.error.message);
 
     const localPlaces = Array.isArray(localResult.data) ? localResult.data : [];
     const communityPlaces = (communityResult.data || [])
@@ -1017,7 +1056,7 @@ async function searchPlaces(query){
       return [...merged.values()];
     }
 
-    currentResults = mergePlaceRecords([...communityPlaces,...localPlaces]);
+    currentResults = mergePlaceRecords([...(shareResult.data||[]),...communityPlaces,...localPlaces]);
     places = mergePlaceRecords([...places,...currentResults]);
     renderPlaces(currentResults);
     renderSaved();
@@ -1036,7 +1075,7 @@ async function searchPlaces(query){
       const payload = await response.json();
       if(requestId !== searchRequestId) return;
       const externalPlaces = (payload.places || []).map(place=>({...place,id:place.source_id || place.id,rating:null,price:null}));
-      currentResults = mergePlaceRecords([...externalPlaces,...communityPlaces,...localPlaces]);
+      currentResults = mergePlaceRecords([...externalPlaces,...(shareResult.data||[]),...communityPlaces,...localPlaces]);
       places = mergePlaceRecords([...places,...currentResults]);
       renderPlaces(currentResults);
       renderSaved();
@@ -1098,9 +1137,16 @@ async function loadInitialNomPlaces(){
     }
   }
 
+  let sharePlaces=[];
+  try{
+    sharePlaces=await loadNomShareCategoryCards("All","");
+  }catch(error){
+    console.warn("NOM initial Share posts:",error.message);
+  }
+
   if(requestId!==searchRequestId)return;
   const merged=new Map();
-  [...communityPlaces,...localPlaces].forEach(place=>{
+  [...sharePlaces,...communityPlaces,...localPlaces].forEach(place=>{
     const key=String(place.source_id||place.id);
     const previous=merged.get(key)||{};
     merged.set(key,{...previous,...place,
