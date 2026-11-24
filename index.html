@@ -2104,15 +2104,6 @@ function playNomMusicPreview(index){
 /* AVATAR PICKER — bind directly after the page elements exist.
    Avoid relying on inline file-input handlers in mobile Safari. */
 window.previewExistingAvatar=previewExistingAvatar;
-document.addEventListener("change",(event)=>{
-  const input=event.target;
-  if(input&&input.id==="existingAvatarFile"){
-    previewExistingAvatar(input).catch(error=>{
-      const message=document.getElementById("existingAvatarMessage");
-      if(message)message.textContent=error.message||"Could not prepare that image.";
-    });
-  }
-},true);
 const existingAvatarInput=document.getElementById("existingAvatarFile");
 if(existingAvatarInput){
   existingAvatarInput.addEventListener("click",()=>{
