@@ -1350,9 +1350,20 @@ async function deleteNomPost(postId,button){
   }
 }
 
+function enableNomFeedFullscreen(feed){
+ if(!feed||feed.dataset.fullscreenReady==="1")return;
+ feed.dataset.fullscreenReady="1";
+ feed.addEventListener("click",function(event){
+  const control=event.target.closest(".nom-post-fullscreen-button");
+  if(control){event.preventDefault();event.stopPropagation();openPostMediaFullscreen(control);return;}
+  const photo=event.target.closest("img.nom-post-media");
+  if(photo){event.preventDefault();event.stopPropagation();openPostMediaFullscreen(photo);}
+ });
+}
 async function loadNomPostsFeed(){
   const feed=document.getElementById("nomPostsFeed");
   if(!feed)return;
+  enableNomFeedFullscreen(feed);
   if(!supabaseClient){feed.innerHTML='<p class="small">NOM Community is temporarily unavailable. Please refresh.</p>';return;}
   feed.innerHTML='<p class="small">Loading NOM posts...</p>';
   try{
