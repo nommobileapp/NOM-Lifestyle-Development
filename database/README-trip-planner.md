@@ -19,3 +19,13 @@ All three tables enable Row Level Security. Policies restrict every operation to
 3. Sign in to NOM and open **My Trip** on a preview of this branch. The app still needs end-to-end member testing.
 
 No booking API keys, payment data or external provider credentials are required for this foundation. External booking links are stored as itinerary references only.
+
+## Optional location-aware AI suggestions
+
+- Edge Function: `nom-trip-suggestions` (JWT verification enabled).
+- AI is off by default per trip. Members explicitly enable it when creating a trip or from that trip's detail view, and can turn it off again.
+- When requested, the browser sends only that member's RLS-loaded saved-place details and the current trip context to the function. The function does not read other members' saved places or persist the prompt.
+- The function uses available coordinates to calculate approximate straight-line proximity between saved places, then asks the AI to group nearby stops and reduce backtracking. Straight-line proximity is not a road route or travel-time estimate.
+- If coordinates are missing, it uses only clearly matching address/area text and tells the member when location confidence is limited. It must not invent distances, travel times, opening hours or locations.
+- Each compact suggestion transfers its place, suggested date/time and notes into the existing itinerary form. The member edits and saves manually.
+- The function uses the existing `OPENAI_API_KEY` Edge Function secret. No OpenAI key is exposed in the browser. End-to-end invocation still needs member testing on the deployed app.
