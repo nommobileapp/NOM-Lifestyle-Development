@@ -1769,7 +1769,8 @@ async function generateNomTripSuggestions(tripId){
  button.disabled=true;button.textContent="✨ Planning nearby stops…";status.textContent="Checking your saved places and their locations…";results.innerHTML="";
  try{
   await loadSavedPlacesForUser(currentUser.id,true);
-  if(savedPlacesError)throw new Error(savedPlacesError);\n  const placesForAI=nomTripSavedPlaceRows();
+  if(savedPlacesError)throw new Error(savedPlacesError);
+  const placesForAI=nomTripSavedPlaceRows();
   if(!placesForAI.length)throw new Error("Save a few places first, then NOM can build a route from them.");
   const {data,error}=await supabaseClient.functions.invoke("nom-trip-suggestions",{body:{destination:trip.destination,start_date:trip.start_date,end_date:trip.end_date,saved_places:placesForAI,existing_items:nomTripItemsCache.map(x=>({date:x.day_date,title:x.title,location:x.location,time:x.start_time})).slice(0,30)}});
   if(error)throw error;
