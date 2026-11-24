@@ -1048,6 +1048,68 @@ async function searchPlaces(query){
 }
 
 
+/* Load the All catalogue explicitly at startup. This avoids depending on a
+   category button tap or the debounced search path for the first render. */
+async function loadInitialNomPlaces(){
+  const requestId=++searchRequestId;
+  const message=document.getElementById("placesMessage");
+  let localPlaces=[];
+  try{
+    if(!supabaseClient)throw new Error("NOM database client is unavailable");
+    const {data,error}=await supabaseClient.rpc("search_places",{
+      search_text:"",
+      category_filter:"All"
+    });
+    if(error)throw error;
+    localPlaces=Array.isArray(data)?data:[];
+  }catch(error){
+    console.warn("NOM initial All catalogue RPC:",error.message);
+    try{
+      localPlaces=await fetchNomPlacesFallback("","All");
+    }catch(fallbackError){
+      console.error("NOM initial catalogue fallback:",fallbackError.message);
+    }
+  }
+
+  let communityPlaces=[];
+  if(supabaseClient){
+    try{
+      const {data,error}=await supabaseClient.from("community_posts")
+        .select("id,title,description,location,category,photo_urls,video_urls,user_id,username,display_name")
+        .eq("status","published").limit(50);
+      if(error)throw error;
+      communityPlaces=(data||[]).map(post=>({
+        id:"community-"+post.id,source_id:"community-"+post.id,name:post.title,
+        description:post.description,location:post.location,category:post.category,
+        image_url:(post.photo_urls||[])[0]||null,image:(post.photo_urls||[])[0]||null,
+        video_urls:post.video_urls||[],
+        community_author:post.username?"@"+post.username:(post.display_name||"NOM member"),
+        rating:null,price:null
+      }));
+    }catch(error){
+      console.warn("NOM initial community places:",error.message);
+    }
+  }
+
+  if(requestId!==searchRequestId)return;
+  const merged=new Map();
+  [...communityPlaces,...localPlaces].forEach(place=>{
+    const key=String(place.source_id||place.id);
+    const previous=merged.get(key)||{};
+    merged.set(key,{...previous,...place,
+      image_url:place.image_url||previous.image_url||null,
+      image:place.image||previous.image||null
+    });
+  });
+  currentResults=[...merged.values()];
+  places=[...new Map([...places,...currentResults].map(place=>[String(place.source_id||place.id),place])).values()];
+  renderPlaces(currentResults);
+  renderSaved();
+  if(message)message.textContent=localPlaces.length
+    ?"Showing places saved in the NOM catalogue."
+    :"No published NOM places are available right now. Please try again shortly.";
+}
+
 /* NOM UNIVERSAL SEARCH — Places, Members, Community and Work */
 let nomSearchTimer=null,nomSearchRequestId=0,nomSearchCategory="all",nomSearchSource="home";
 let nomSearchData={places:[],members:[],community:[],work:[]};
@@ -2352,10 +2414,10 @@ function playNomMusicPreview(index){
 }
 document.getElementById("homePlaces").innerHTML = '<p class="small">Loading places from NOM...</p>';
 document.getElementById("explorePlaces").innerHTML = '<p class="small">Loading places from NOM...</p>';
-searchPlaces("");
 renderSaved();
 renderTrips();
 initialiseApp();
+loadInitialNomPlaces();
 </script>
 
 <!-- NOM searchable Audius player deployment refresh -->
