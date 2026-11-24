@@ -2041,6 +2041,7 @@ async function logout(){
 
     currentUser = null;
     resetSavedPlacesForGuest();
+    nomTripsCache=[];activeNomTripId=null;nomTripItemsCache=[];renderTrips();
     updateProfile();
     message.textContent = "You have logged out.";
   }catch(error){
@@ -2073,6 +2074,7 @@ function initialiseApp(){
 
       if(eventUser){
         loadSavedPlacesForUser(eventUser.id);
+        if(document.getElementById("tripPage")&&!document.getElementById("tripPage").classList.contains("hidden"))loadTrips();
         startNomNotificationListener();
         if(event==="INITIAL_SESSION"||event==="SIGNED_IN"){
           uploadPendingRegistrationAvatar(eventUser).catch(error=>{
