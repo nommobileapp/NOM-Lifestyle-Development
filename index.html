@@ -245,7 +245,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 .community-upload input,.community-upload textarea,.community-upload select{width:100%;background:#111;color:white;border:1px solid var(--border);border-radius:11px;padding:13px;margin:7px 0 13px}
 .community-upload input[type=file]{padding:11px;font-size:12px}
 .community-post{background:var(--panel);border:1px solid var(--border);border-radius:17px;padding:14px;margin:12px 0;overflow:hidden}
-.community-post .community-post-media{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;object-position:center;border-radius:12px;margin:8px 0;background:#080808}.community-post .community-post-media,.nom-post-media{cursor:zoom-in}.nom-post-video-frame{position:relative;width:100%;margin:10px 0}.nom-post-video-frame .nom-post-media{margin:0}.nom-post-fullscreen-button{position:absolute;right:9px;top:9px;z-index:2;width:40px;height:40px;border:1px solid #ffffff88;border-radius:50%;background:#111c;color:#fff;font-size:23px;line-height:1;display:grid;place-items:center}
+.community-post .community-post-media{display:block;width:100%;height:100%;object-fit:contain;object-position:center;border-radius:12px;margin:0;background:#080808}.community-post .nom-media-frame,.nom-media-frame{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;margin:8px 0;background:#080808}.nom-media-frame img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}.community-post .community-post-media,.nom-post-media{cursor:zoom-in}.nom-post-video-frame{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;margin:10px 0;border-radius:12px;background:#080808}.nom-post-video-frame .nom-post-media{display:block;width:100%;height:100%;object-fit:contain;object-position:center;margin:0}.nom-post-fullscreen-button{position:absolute;right:9px;top:9px;z-index:2;width:40px;height:40px;border:1px solid #ffffff88;border-radius:50%;background:#111c;color:#fff;font-size:23px;line-height:1;display:grid;place-items:center}
 .community-post .post-meta{font-size:11px;color:var(--lime);margin:9px 0 4px}
 .community-post .post-author{font-size:12px;color:var(--orange)}
 .community-post .post-status{font-size:11px;color:var(--lime);margin-top:8px}
@@ -297,7 +297,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 .nom-post-card .post-author{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .nom-post-card .post-meta{font-size:.76rem;color:var(--lime);margin:8px 0}
 .nom-post-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:10px 0;color:#f4f4f4}
-.nom-post-media{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;object-position:center;border-radius:12px;margin:10px 0;background:#080808}
+.nom-post-media{display:block;width:100%;height:100%;object-fit:contain;object-position:center;border-radius:12px;margin:0;background:#080808}
 .nom-post-audio{display:block;width:100%;margin:12px 0}
 .nom-post-actions{display:flex;justify-content:flex-end;margin-top:12px}.nom-post-delete{border:1px solid rgba(255,125,45,.45);background:rgba(255,125,45,.08);color:#ff9a5b;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700}.nom-post-delete:disabled{opacity:.55}
 </style>
@@ -1312,8 +1312,8 @@ function communityPostCard(post,own=false){
   nomDetailItems[String(post.id)]={id:post.id,kind:"community",name:post.title,description:post.description,location:post.location,category:post.category,photos,videos,author:post.username?"@"+post.username:(post.display_name||"NOM member")};
   const status="Published on NOM";
   const authorIdentity='<span class="nom-identity-row">'+nomAvatarMarkup(post.avatar_url,post.username||"NOM member",true)+'<span>'+escapeHTML(post.username?"@"+post.username:(post.display_name||"NOM member"))+'</span></span>';
-  const photoPreviews=photos.map(url=>'<img class="community-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(url)+'" onclick="openPostMediaFullscreen(this);event.stopPropagation()" src="'+escapeHTML(url)+'" alt="'+escapeHTML(post.title)+'" loading="lazy">').join("");
-  const videoPreviews=videos.map(url=>'<div class="nom-post-video-frame"><video class="community-post-media" controls playsinline preload="metadata" src="'+escapeHTML(url)+'" onclick="event.stopPropagation()"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(url)+'" onclick="openPostMediaFullscreen(this);event.stopPropagation()">⛶</button></div>').join("");
+  const photoPreviews=photos.map(url=>'<div class="nom-media-frame"><img class="community-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(url)+'" src="'+escapeHTML(url)+'" alt="'+escapeHTML(post.title)+'" loading="lazy"></div>').join("");
+  const videoPreviews=videos.map(url=>'<div class="nom-post-video-frame"><video class="community-post-media" controls playsinline preload="metadata" src="'+escapeHTML(url)+'" onclick="event.stopPropagation()"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(url)+'">⛶</button></div>').join("");
   const mediaCount=photos.length+videos.length;
   return '<article class="community-post" role="button" tabindex="0" data-detail-id="'+escapeHTML(String(post.id))+'" onclick="openPlaceDetail(this.dataset.detailId)" onkeydown="if(event.key===\'Enter\'){openPlaceDetail(this.dataset.detailId)}">'+photoPreviews+videoPreviews+
     '<div class="post-meta">'+escapeHTML(post.category||"DISCOVERY")+' · '+escapeHTML(post.location||"")+'</div>'+
@@ -1354,11 +1354,15 @@ function enableNomFeedFullscreen(feed){
  if(!feed||feed.dataset.fullscreenReady==="1")return;
  feed.dataset.fullscreenReady="1";
  feed.addEventListener("click",function(event){
-  const control=event.target.closest(".nom-post-fullscreen-button");
-  if(control){event.preventDefault();event.stopPropagation();openPostMediaFullscreen(control);return;}
-  const photo=event.target.closest("img.nom-post-media");
-  if(photo){event.preventDefault();event.stopPropagation();openPostMediaFullscreen(photo);}
- });
+  const target=event.target instanceof Element?event.target:event.target?.parentElement;
+  if(!target)return;
+  const control=target.closest(".nom-post-fullscreen-button");
+  const photo=target.closest("img.nom-post-media, img.community-post-media");
+  const media=control||photo;
+  if(!media)return;
+  event.preventDefault();event.stopPropagation();
+  openPostMediaFullscreen(media);
+ },true);
 }
 async function loadNomPostsFeed(){
   const feed=document.getElementById("nomPostsFeed");
@@ -1393,8 +1397,8 @@ async function loadNomPostsFeed(){
       const profile=profileMap[post.user_id]||{},username=profile.username||profile.display_name||"NOM member";
       const avatar=nomAvatarMarkup(profile.avatar_url||"",username,true);
       const mediaHtml=(mediaMap[post.id]||[]).map(item=>{
-        if(item.media_type==="image")return '<img class="nom-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(item.url)+'" onclick="openPostMediaFullscreen(this)" src="'+escapeHTML(item.url)+'" alt="Photo shared on NOM" loading="lazy">';
-        if(item.media_type==="video")return '<div class="nom-post-video-frame"><video class="nom-post-media" controls playsinline preload="metadata" src="'+escapeHTML(item.url)+'"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(item.url)+'" onclick="openPostMediaFullscreen(this)">⛶</button></div>';
+        if(item.media_type==="image")return '<div class="nom-media-frame"><img class="nom-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(item.url)+'" src="'+escapeHTML(item.url)+'" alt="Photo shared on NOM" loading="lazy"></div>';
+        if(item.media_type==="video")return '<div class="nom-post-video-frame"><video class="nom-post-media" controls playsinline preload="metadata" src="'+escapeHTML(item.url)+'"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(item.url)+'">⛶</button></div>';
         if(item.media_type==="audio")return '<audio class="nom-post-audio" controls preload="metadata" src="'+escapeHTML(item.url)+'"></audio>';
         return "";
       }).join("");
@@ -1412,6 +1416,7 @@ async function loadNomPostsFeed(){
 
 async function loadCommunityFeed(){
   const feed=document.getElementById("communityFeed"),mine=document.getElementById("myCommunitySubmissions");if(!feed||!mine)return;
+  enableNomFeedFullscreen(feed);
   loadNomPostsFeed();
   const {data:published,error}=await supabaseClient.from("community_posts").select("id,user_id,title,description,location,category,photo_urls,video_urls,username,display_name,status,created_at").eq("status","published").order("created_at",{ascending:false}).limit(40);
   const publishedAvatars=await getNomAvatarMap((published||[]).map(p=>p.user_id));
