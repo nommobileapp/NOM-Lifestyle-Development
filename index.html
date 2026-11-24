@@ -496,7 +496,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <p class="small">Your NOM account</p>
     <div class="avatar-upload">
       <label for="existingAvatarFile">Change profile picture</label>
-      <input id="existingAvatarFile" type="file" accept="image/*" aria-label="Choose a new profile picture" onchange="previewExistingAvatar(this)">
+      <input id="existingAvatarFile" type="file" accept="image/*" aria-label="Choose a new profile picture">
       <img id="existingAvatarPreview" class="avatar-preview hidden" alt="New profile picture preview">
       <button class="primary hidden" id="saveExistingAvatar" type="button" onclick="saveExistingAvatar()">Save profile picture</button>
       <div class="message" id="existingAvatarMessage"></div>
@@ -2100,6 +2100,19 @@ function playNomMusicPreview(index){
  nomMusicAudio=audio;audio.src=track.previewUrl;audio.style.display="block";
  audio.play().then(()=>{document.getElementById("nomMusicMessage").textContent="♫ Previewing "+track.trackName+" — "+track.artistName;}).catch(()=>{document.getElementById("nomMusicMessage").textContent="Tap play on the audio controls to hear this preview.";});
 }
+/* AVATAR PICKER — bind directly after the page elements exist.
+   Avoid relying on inline file-input handlers in mobile Safari. */
+const existingAvatarInput=document.getElementById("existingAvatarFile");
+if(existingAvatarInput){
+  existingAvatarInput.addEventListener("change",()=>{
+    previewExistingAvatar(existingAvatarInput).catch(error=>{
+      const message=document.getElementById("existingAvatarMessage");
+      if(message)message.textContent=error.message||"Could not prepare that image.";
+    });
+  });
+  window.previewExistingAvatar=previewExistingAvatar;
+}
+
 document.getElementById("homePlaces").innerHTML = '<p class="small">Loading places from NOM...</p>';
 document.getElementById("explorePlaces").innerHTML = '<p class="small">Loading places from NOM...</p>';
 searchPlaces("");
