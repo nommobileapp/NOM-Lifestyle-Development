@@ -1046,7 +1046,7 @@ let nomSearchTimer=null,nomSearchRequestId=0,nomSearchCategory="all",nomSearchSo
 let nomSearchData={places:[],members:[],community:[],work:[]};
 let nomSearchExternalMessage="";
 function setNomSearchCategory(category){nomSearchCategory=category;renderNOMSearchResults();}
-function nomSearchSafeTerm(value){return String(value||"").trim().replace(/[%,()\\\\'"]/g," ").replace(/\\s+/g," ").slice(0,80);}
+function nomSearchSafeTerm(value){return String(value||"").trim().replace(/[%,()\\\\'"]/g," ").replace(/\s+/g," ").slice(0,80);}
 function nomSearchTabsMarkup(){
  const counts={all:nomSearchData.places.length+nomSearchData.members.length+nomSearchData.community.length+nomSearchData.work.length,places:nomSearchData.places.length,members:nomSearchData.members.length,community:nomSearchData.community.length,work:nomSearchData.work.length};
  return [["all","All"],["places","Places"],["members","Members"],["community","Community"],["work","Work"]].map(([key,label])=>'<button type="button" class="nom-search-tab '+(nomSearchCategory===key?"active":"")+'" onclick="setNomSearchCategory(\''+key+'\')">'+label+' · '+counts[key]+'</button>').join("");
@@ -1777,7 +1777,7 @@ function nomTripDistanceKm(a,b){
  return 6371*2*Math.asin(Math.sqrt(h));
 }
 function nomTripAreaTokens(value){
- return [...new Set(String(value||"").toLowerCase().replace(/[^a-z0-9\\s]/g," ").split(/\\s+/).filter(word=>word.length>=4&&!["near","area","street","road","jalan","bali","indonesia"].includes(word)))];
+ return [...new Set(String(value||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(word=>word.length>=4&&!["near","area","street","road","jalan","bali","indonesia"].includes(word)))];
 }
 function nomTripLocationOverlap(a,b){
  const left=nomTripAreaTokens(a),right=new Set(nomTripAreaTokens(b));
@@ -1794,7 +1794,7 @@ function nomTripScheduleForPlace(place,trip,items,clusterIndex,days){
  dayRows.sort((a,b)=>b.overlap-a.overlap||a.rows.length-b.rows.length||Math.abs(a.offset-(clusterIndex%days))-Math.abs(b.offset-(clusterIndex%days)));
  const chosen=dayRows[0]||{offset:0,date:null,rows:[],overlap:0};
  const slots=["09:00","10:30","12:00","13:30","15:00","16:30","18:00"];
- const occupied=chosen.rows.map(item=>String(item.start_time||"").slice(0,5)).filter(v=>/^\\d{2}:\\d{2}$/.test(v)).map(v=>{const [h,m]=v.split(":").map(Number);return h*60+m;});
+ const occupied=chosen.rows.map(item=>String(item.start_time||"").slice(0,5)).filter(v=>/^\d{2}:\d{2}$/.test(v)).map(v=>{const [h,m]=v.split(":").map(Number);return h*60+m;});
  const available=slots.find(slot=>{const [h,m]=slot.split(":").map(Number),mins=h*60+m;return occupied.every(existing=>Math.abs(existing-mins)>=90);})||"";
  const nearby=chosen.rows.find(item=>nomTripLocationOverlap(place.address,item.location)>0);
  return {day_offset:chosen.offset,date:chosen.date,time:available,nearby_title:nearby?.title||"",nearby_location:nearby?.location||"",overlap:chosen.overlap};
