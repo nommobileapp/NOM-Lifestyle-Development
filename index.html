@@ -571,6 +571,7 @@ let savedIds = JSON.parse(localStorage.getItem("nomSaved") || "[]");
 let savedPlaceRecords = [];
 let savedPlacesLoadedUser = null;
 let savedPlacesLoadingUser = null;
+let savedPlacesError = "";
 let trips = JSON.parse(localStorage.getItem("nomTrips") || "[]");
 
 /* NAVIGATION */
@@ -586,7 +587,10 @@ function showPage(page){
     button.classList.toggle("active",button.dataset.page === page);
   });
 
-  if(page === "saved") renderSaved();
+  if(page === "saved"){
+    if(currentUser) loadSavedPlacesForUser(currentUser.id,true);
+    else renderSaved();
+  }
   if(page === "trip") renderTrips();
   if(page === "profile") updateProfile();
   if(page === "community") loadCommunityFeed();
@@ -1538,12 +1542,12 @@ function resetSavedPlacesForGuest(){
  renderSaved();
  renderPlaces();
 }
-async function loadSavedPlacesForUser(userId){
+async function loadSavedPlacesForUser(userId,forceRefresh=false){
  if(!userId||!supabaseClient)return;
- if(savedPlacesLoadedUser===userId||savedPlacesLoadingUser===userId)return;
+ if(savedPlacesLoadingUser===userId)return;
+ if(savedPlacesLoadedUser===userId&&!forceRefresh)return;
  savedPlacesLoadingUser=userId;
- savedIds=[];
- savedPlaceRecords=[];
+ savedPlacesError="";
  try{
   const guestIds=getGuestSavedIds();
   const guestRecords=getSavedPlaceRecords().filter(place=>guestIds.includes(String(place.id)));
@@ -1568,10 +1572,10 @@ async function loadSavedPlacesForUser(userId){
   savedPlaceRecords=Array.isArray(data)?data:[];
   savedIds=savedPlaceRecords.map(row=>String(row.place_key));
   savedPlacesLoadedUser=userId;
+  savedPlacesError="";
  }catch(error){
   console.warn("NOM saved places sync:",error.message);
-  savedPlaceRecords=[];
-  savedIds=[];
+  savedPlacesError="Saved places could not be loaded. Please try again.";
  }finally{
   if(savedPlacesLoadingUser===userId)savedPlacesLoadingUser=null;
   renderSaved();
@@ -1650,11 +1654,15 @@ async function toggleSave(id){
 }
 function renderSaved(){
  let list=[];
+ let status="";
  if(currentUser){
-  list=savedPlaceRecords.map(row=>({...row.place_data,id:String(row.place_key)}));
-  if(savedPlacesLoadingUser===currentUser.id&&!savedPlacesLoadedUser){
+  list=savedPlaceRecords.map(row=>({...((row&&row.place_data)||{}),id:String(row.place_key)}));
+  if(savedPlacesLoadingUser===currentUser.id&&!savedPlacesLoadedUser&&!list.length){
    document.getElementById("savedPlaces").innerHTML='<p>Loading your saved places...</p>';
    return;
+  }
+  if(savedPlacesError){
+   status='<p class="small">'+escapeHTML(savedPlacesError)+' <button class="secondary" type="button" onclick="loadSavedPlacesForUser(currentUser.id,true)">Try again</button></p>';
   }
  }else{
   const stored=getSavedPlaceRecords();
@@ -1664,9 +1672,9 @@ function renderSaved(){
   [...legacy,...stored].forEach(place=>byId.set(String(place.id),place));
   list=[...byId.values()].filter(place=>guestIds.includes(String(place.id)));
  }
- document.getElementById("savedPlaces").innerHTML=list.length
+ document.getElementById("savedPlaces").innerHTML=status+(list.length
   ?list.map(placeCard).join("")
-  :'<p>No saved places yet. Explore NOM and save somewhere you love.</p>';
+  :currentUser&&savedPlacesError?"":'<p>No saved places yet. Explore NOM and save somewhere you love.</p>');
 }
 
 /* TRIP PLANNER */
