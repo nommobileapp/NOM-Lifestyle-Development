@@ -1773,42 +1773,32 @@ async function loadTripSavedSuggestions(trip){
   const match=destination&&searchable.includes(destination);
   return {key:String(row.place_key),title:String(title),location:String(location),description:String(description),match};
  }).sort((a,b)=>Number(b.match)-Number(a.match));
- target.innerHTML='<h3 style="margin-top:0">✨ Smart trip suggestions</h3><p class="small">Edit each suggestion before adding it. Nothing is saved to your itinerary until you tap Add.</p>'+placesList.map((p,i)=>{
-  const prefix="tripSavedDraft_"+i;
-  const defaultDay=trip.start_date||"";
-  return '<div style="padding:14px 0;border-top:1px solid var(--border)"><div class="place-meta">'+(p.match?'GOOD DESTINATION MATCH':'FROM YOUR SAVED PLACES')+'</div><strong>'+escapeHTML(p.title)+'</strong>'+(p.description?'<p class="small">'+escapeHTML(p.description)+'</p>':'')+
-  '<label for="'+prefix+'_title">Itinerary title</label><input id="'+prefix+'_title" maxlength="160" value="'+escapeHTML(p.title)+'">'+
-  '<label for="'+prefix+'_location">Location / area</label><input id="'+prefix+'_location" maxlength="200" value="'+escapeHTML(p.location)+'" placeholder="Add an area or address">'+
-  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><div><label for="'+prefix+'_date">Day</label><input id="'+prefix+'_date" type="date" value="'+escapeHTML(defaultDay)+'" min="'+escapeHTML(trip.start_date||"")+'" max="'+escapeHTML(trip.end_date||"")+'"></div><div><label for="'+prefix+'_time">Time</label><input id="'+prefix+'_time" type="time"></div></div>'+
-  '<label for="'+prefix+'_notes">Notes / plan</label><textarea id="'+prefix+'_notes" rows="2" maxlength="1500" placeholder="What would you like to do here?"></textarea>'+
-  '<label for="'+prefix+'_cost">Estimated cost (optional)</label><input id="'+prefix+'_cost" type="number" min="0" step="0.01" placeholder="Amount">'+
-  '<label for="'+prefix+'_url">Website / booking link (optional)</label><input id="'+prefix+'_url" type="url" placeholder="https://…">'+
-  '<button class="secondary" style="margin-top:10px" onclick="addSavedPlaceToTrip(\''+trip.id+'\',\''+encodeURIComponent(p.key)+'\',\''+i+'\')">Add to itinerary</button></div>';
- }).join("");
+ target.innerHTML='<h3 style="margin-top:0">✨ Smart trip suggestions</h3><p class="small">Ideas from your NOM Saved Places. Choose one to transfer it into the itinerary form below, where you can edit all details before saving.</p>'+placesList.map((p,i)=>
+  '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border)"><div style="min-width:0;flex:1"><div class="place-meta">'+(p.match?'GOOD DESTINATION MATCH':'FROM YOUR SAVED PLACES')+'</div><strong>'+escapeHTML(p.title)+'</strong>'+(p.location?'<p class="small" style="margin:4px 0 0">'+escapeHTML(p.location)+'</p>':'')+(p.description?'<p class="small" style="margin:4px 0 0">'+escapeHTML(p.description)+'</p>':'')+'</div><button class="secondary" style="flex-shrink:0" onclick="transferSavedPlaceToTripForm(\\''+trip.id+'\\',\\''+encodeURIComponent(p.key)+'\\')">Use suggestion</button></div>'
+ ).join("");
 }
-async function addSavedPlaceToTrip(tripId,encodedKey,index){
+async function transferSavedPlaceToTripForm(tripId,encodedKey){
  if(!currentUser||activeNomTripId!==tripId||!supabaseClient)return;
- const key=decodeURIComponent(encodedKey),trip=nomTripsCache.find(t=>t.id===tripId),prefix="tripSavedDraft_"+index;
+ const key=decodeURIComponent(encodedKey),trip=nomTripsCache.find(t=>t.id===tripId);
  if(!trip)return;
- const read=id=>document.getElementById(prefix+"_"+id);
- const title=String(read("title")?.value||"").trim().slice(0,160);
- const location=String(read("location")?.value||"").trim().slice(0,200);
- const day=read("date")?.value||null;
- const time=read("time")?.value||null;
- const notes=String(read("notes")?.value||"").trim().slice(0,1500);
- const costText=String(read("cost")?.value||"").trim();
- const cost=costText===""?null:Number(costText);
- const url=String(read("url")?.value||"").trim();
- if(!title){alert("Please add a title for this itinerary item.");return;}
- if(cost!==null&&(!Number.isFinite(cost)||cost<0)){alert("Please enter a valid estimated cost.");return;}
- if(day&&((trip.start_date&&day<trip.start_date)||(trip.end_date&&day>trip.end_date))){alert("Choose a day within this trip's dates.");return;}
- if(url){try{const parsed=new URL(url);if(!["http:","https:"].includes(parsed.protocol))throw new Error();}catch(_){alert("Please enter a valid website or booking link.");return;}}
- const {data,error}=await supabaseClient.from("saved_places").select("place_key").eq("user_id",currentUser.id).eq("place_key",key).maybeSingle();
+ const {data,error}=await supabaseClient.from("saved_places").select("place_data").eq("user_id",currentUser.id).eq("place_key",key).maybeSingle();
  if(error||!data){alert(error?.message||"This saved place could not be found.");return;}
- if(nomTripItemsCache.some(x=>String(x.title||"").toLowerCase()===title.toLowerCase()&&x.day_date===day)){alert("This place is already in your itinerary for that day.");return;}
- const {data:item,error:insertError}=await supabaseClient.from("trip_items").insert({trip_id:tripId,owner_id:currentUser.id,day_date:day,item_type:"place",title,location:location||null,start_time:time,notes:notes||null,external_url:url||null,estimated_cost:cost,currency_code:trip.budget_currency||"USD"}).select("id,trip_id,owner_id,day_date,item_type,title,location,start_time,notes,external_url,estimated_cost,currency_code,sort_order").single();
- if(insertError){alert(insertError.message||"Could not add this place.");return;}
- nomTripItemsCache.push(item);renderNomTripDetail(trip);
+ const p=data.place_data&&typeof data.place_data==="object"?data.place_data:{};
+ const title=String(p.name||p.title||p.place_name||p.display_name||"Saved place").slice(0,160);
+ const location=String(p.address||p.location||p.city||p.area||p.region||p.vicinity||"").slice(0,200);
+ const notes=String(p.description||p.about||"").slice(0,1500);
+ const set=(id,value)=>{const el=document.getElementById(id);if(el)el.value=value;};
+ set("tripItemTitle",title);
+ set("tripItemType","place");
+ set("tripItemLocation",location);
+ set("tripItemDate",trip.start_date||"");
+ set("tripItemTime","");
+ set("tripItemCost","");
+ set("tripItemUrl","");
+ set("tripItemNotes",notes);
+ const msg=document.getElementById("tripItemMessage");if(msg)msg.textContent="Suggestion added to the form. Edit the details, then save it to your itinerary.";
+ const form=document.getElementById("tripItemTitle");
+ if(form){form.scrollIntoView({behavior:"smooth",block:"center"});form.focus({preventScroll:true});}
 }
 async function saveNomTripItem(tripId){
  if(!currentUser||activeNomTripId!==tripId)return;const msg=document.getElementById("tripItemMessage"),title=document.getElementById("tripItemTitle").value.trim(),type=document.getElementById("tripItemType").value,day=document.getElementById("tripItemDate").value||null,location=document.getElementById("tripItemLocation").value.trim(),time=document.getElementById("tripItemTime").value||null,cv=document.getElementById("tripItemCost").value,cost=cv===""?null:Number(cv),url=document.getElementById("tripItemUrl").value.trim(),notes=document.getElementById("tripItemNotes").value.trim();
