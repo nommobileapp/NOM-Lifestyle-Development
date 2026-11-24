@@ -939,11 +939,16 @@ async function fetchNomPlacesFallback(query,category){
 }
 
 async function loadNomPlaces(query,category){
+  /* The All view is the catalogue baseline. Read it directly so the first
+     Home/Explore render never depends on the RPC's null-category behaviour. */
+  if(!category || category==="All"){
+    return await fetchNomPlacesFallback(query,"All");
+  }
   if(supabaseClient){
     try{
       const {data,error}=await supabaseClient.rpc("search_places",{
         search_text:query,
-        category_filter:(!category || category==="All") ? null : category
+        category_filter:category
       });
       if(!error && Array.isArray(data) && data.length)return data;
       if(error)console.warn("NOM RPC search unavailable; using direct catalogue fallback:",error.message);
