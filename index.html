@@ -559,6 +559,13 @@ window.NOM_COMMUNITY_MAX_FILE=50*1024*1024;
 const SUPABASE_URL = "https://ojzzroswtzjnnoigjpuc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xc8mdZ1eb8XtEyxtn3tfXg_DnqNNfjI";
 
+const NOM_AUTH_STORAGE_KEY = (()=>{
+  const path=(window.location.pathname||"").toLowerCase();
+  if(path.includes("/nom-lifestyle-development/"))return "nom-lifestyle-auth-dev";
+  if(path.includes("/nom-search-preview/"))return "nom-lifestyle-auth-preview";
+  return "nom-lifestyle-auth-live";
+})();
+
 const supabaseClient = window.supabase?.createClient
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
@@ -566,7 +573,7 @@ const supabaseClient = window.supabase?.createClient
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storage: window.localStorage,
-        storageKey: "nom-lifestyle-auth"
+        storageKey: NOM_AUTH_STORAGE_KEY
       }
     })
   : null;
@@ -1628,12 +1635,15 @@ function resetSavedPlacesForGuest(){
  renderSaved();
  renderPlaces();
 }
-async function loadSavedPlacesForUser(userId,forceRefresh=false){
+async function loadSavedPlacesForUser(userId,force=false){
  if(!userId||!supabaseClient)return;
- if(savedPlacesLoadingUser===userId)return;
- if(savedPlacesLoadedUser===userId&&!forceRefresh)return;
- savedPlacesLoadingUser=userId;
+ if(!force&&(savedPlacesLoadedUser===userId||savedPlacesLoadingUser===userId))return;
+ const sameUserCache=savedPlacesLoadedUser===userId;
+ const previousRecords=sameUserCache?savedPlaceRecords.slice():[];
+ const previousIds=sameUserCache?savedIds.slice():[];
  savedPlacesError="";
+ savedPlacesLoadingUser=userId;
+ if(!sameUserCache){savedIds=[];savedPlaceRecords=[];}
  try{
   const guestIds=getGuestSavedIds();
   const guestRecords=getSavedPlaceRecords().filter(place=>guestIds.includes(String(place.id)));
@@ -1658,10 +1668,14 @@ async function loadSavedPlacesForUser(userId,forceRefresh=false){
   savedPlaceRecords=Array.isArray(data)?data:[];
   savedIds=savedPlaceRecords.map(row=>String(row.place_key));
   savedPlacesLoadedUser=userId;
-  savedPlacesError="";
  }catch(error){
+  savedPlacesError=error.message||"Could not refresh saved places.";
   console.warn("NOM saved places sync:",error.message);
-  savedPlacesError="Saved places could not be loaded. Please try again.";
+  if(currentUser?.id===userId){
+   savedPlaceRecords=previousRecords;
+   savedIds=previousIds;
+   if(sameUserCache)savedPlacesLoadedUser=userId;
+  }
  }finally{
   if(savedPlacesLoadingUser===userId)savedPlacesLoadingUser=null;
   renderSaved();
@@ -1740,15 +1754,11 @@ async function toggleSave(id){
 }
 function renderSaved(){
  let list=[];
- let status="";
  if(currentUser){
-  list=savedPlaceRecords.map(row=>({...((row&&row.place_data)||{}),id:String(row.place_key)}));
-  if(savedPlacesLoadingUser===currentUser.id&&!savedPlacesLoadedUser&&!list.length){
+  list=savedPlaceRecords.map(row=>({...row.place_data,id:String(row.place_key)}));
+  if(savedPlacesLoadingUser===currentUser.id&&!savedPlacesLoadedUser){
    document.getElementById("savedPlaces").innerHTML='<p>Loading your saved places...</p>';
    return;
-  }
-  if(savedPlacesError){
-   status='<p class="small">'+escapeHTML(savedPlacesError)+' <button class="secondary" type="button" onclick="loadSavedPlacesForUser(currentUser.id,true)">Try again</button></p>';
   }
  }else{
   const stored=getSavedPlaceRecords();
@@ -1758,11 +1768,13 @@ function renderSaved(){
   [...legacy,...stored].forEach(place=>byId.set(String(place.id),place));
   list=[...byId.values()].filter(place=>guestIds.includes(String(place.id)));
  }
- document.getElementById("savedPlaces").innerHTML=status+(list.length
+ const retry=savedPlacesError
+  ?'<p class="small">Could not refresh Saved Places. Your previous saved list has been kept. <button class="secondary" onclick="loadSavedPlacesForUser(currentUser.id,true)">Retry</button></p>'
+  :"";
+ document.getElementById("savedPlaces").innerHTML=retry+(list.length
   ?list.map(placeCard).join("")
-  :currentUser&&savedPlacesError?"":'<p>No saved places yet. Explore NOM and save somewhere you love.</p>');
+  :(savedPlacesError?'<p>Saved Places could not be loaded. Please try again.</p>':'<p>No saved places yet. Explore NOM and save somewhere you love.</p>'));
 }
-
 /* NOM TRIP PLANNER — private, account-synced foundation */
 function tripDateLabel(start,end){
  if(!start&&!end)return "Dates not set";
