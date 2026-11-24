@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
       return Response.json({ error: "Add a destination and save some places first." }, { status: 400, headers: corsHeaders });
     }
 
-    const cleanPlaces = places.map((p: any) => ({
+    const cleanPlaces: any[] = places.map((p: any) => ({
       place_key: String(p?.place_key || "").slice(0, 180),
       name: String(p?.name || "Saved place").slice(0, 160),
       category: String(p?.category || "place").slice(0, 60),
