@@ -1,6 +1,6 @@
 # NOM Trip Planner database setup
 
-This schema is prepared for the `feature/trip-planner-foundation` branch. It has **not** been applied to the live NOM Supabase project.
+This schema is committed on `feature/trip-planner-foundation` and has been applied to the shared NOM Supabase project `nom-lifestyle` after explicit approval. It adds three new tables and does not modify existing NOM tables or records.
 
 ## Tables
 
@@ -14,9 +14,8 @@ All three tables enable Row Level Security. Policies restrict every operation to
 
 ## Before testing the branch
 
-1. Review and run `trip-planner-schema.sql` in the NOM Supabase SQL Editor.
-2. In the Supabase project's Data API settings, confirm that `trips`, `trip_items`, and `trip_expenses` are exposed to the Data API. New public tables are not automatically exposed on current Supabase projects.
-3. Confirm authenticated role access is present (the SQL grants SELECT, INSERT, UPDATE and DELETE to `authenticated`).
-4. Sign in to NOM and open **My Trip**.
+1. The schema has been applied to the shared NOM Supabase project.
+2. Verified: all three tables exist, RLS is enabled, each has four owner-only policies, and the `authenticated` role has SELECT, INSERT, UPDATE and DELETE privileges.
+3. Sign in to NOM and open **My Trip** on a preview of this branch. The app still needs end-to-end member testing.
 
 No booking API keys, payment data or external provider credentials are required for this foundation. External booking links are stored as itinerary references only.
