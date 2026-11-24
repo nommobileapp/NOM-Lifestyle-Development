@@ -5,7 +5,7 @@
 create table if not exists public.trips (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
-  title text not null check (char_length(trim(title)) between 2 and 100),
+  title text not null check (char_length(trim(title)) between 2 and 160),
   destination text not null check (char_length(trim(destination)) between 2 and 160),
   start_date date,
   end_date date,
