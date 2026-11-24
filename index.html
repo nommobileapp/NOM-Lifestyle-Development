@@ -326,10 +326,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
   <input class="search" id="homeSearch" placeholder="Search places, members, community, work..." oninput="searchNOM(this.value,'home')"><div class="nom-universal-search hidden" id="homeUniversalSearch"><div class="nom-search-tabs" id="homeSearchTabs"></div><div id="homeSearchResults" aria-live="polite"><div class="nom-search-hint">Search across NOM.</div></div></div>
   <div class="categories">
     <button class="category active" onclick="filterPlaces('All',this)">All</button>
+    <button class="category" onclick="filterPlaces('Places',this)">Places</button>
     <button class="category" onclick="filterPlaces('Nature',this)">Nature</button>
-    <button class="category" onclick="filterPlaces('Food',this)">Food</button>
-    <button class="category" onclick="filterPlaces('Beach',this)">Beach</button>
-    <button class="category" onclick="filterPlaces('Culture',this)">Culture</button>
+    <button class="category" onclick="filterPlaces('Community',this)">Community</button>
+    <button class="category" onclick="filterPlaces('Culture &amp; Lifestyle',this)">Culture &amp; Lifestyle</button>
   </div>
   <div class="cards" id="homePlaces"></div>
 
@@ -348,10 +348,10 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
   <input class="search" id="exploreSearch" placeholder="Search places, members, community, work..." oninput="searchNOM(this.value,'explore')"><div class="nom-universal-search hidden" id="exploreUniversalSearch"><div class="nom-search-tabs" id="exploreSearchTabs"></div><div id="exploreSearchResults" aria-live="polite"><div class="nom-search-hint">Search across NOM.</div></div></div>
   <div class="categories">
     <button class="category active" onclick="filterPlaces('All',this)">All</button>
+    <button class="category" onclick="filterPlaces('Places',this)">Places</button>
     <button class="category" onclick="filterPlaces('Nature',this)">Nature</button>
-    <button class="category" onclick="filterPlaces('Food',this)">Food</button>
-    <button class="category" onclick="filterPlaces('Beach',this)">Beach</button>
-    <button class="category" onclick="filterPlaces('Culture',this)">Culture</button>
+    <button class="category" onclick="filterPlaces('Community',this)">Community</button>
+    <button class="category" onclick="filterPlaces('Culture &amp; Lifestyle',this)">Culture &amp; Lifestyle</button>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0">
     <button class="secondary" id="importBaliButton" type="button" onclick="importBaliPlaces()">Save up to 100 Bali places to NOM</button>
@@ -377,7 +377,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
     <label for="nomShareBody">Your story</label>
     <textarea id="nomShareBody" maxlength="3000" placeholder="Share what's on your mind..."></textarea>
     <label for="nomShareCategory">Category</label>
-    <select id="nomShareCategory"><option>General</option><option>Travel</option><option>Food</option><option>Music</option><option>Work</option><option>Lifestyle</option></select>
+    <select id="nomShareCategory"><option value="Places">Places</option><option value="Nature">Nature</option><option value="Community">Community</option><option value="Culture &amp; Lifestyle">Culture &amp; Lifestyle</option></select>
     <label for="nomSharePlace">Add a place (optional)</label>
     <input id="nomSharePlace" maxlength="160" placeholder="Place name">
     <input id="nomShareLocation" maxlength="200" placeholder="City, island or country">
