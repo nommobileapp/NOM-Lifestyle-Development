@@ -966,6 +966,42 @@ async function loadNomPlaces(query,category){
   return await fetchNomPlacesFallback(query,category);
 }
 
+async function loadNomShareCategoryCards(category="All",query=""){
+  if(!supabaseClient)return [];
+  let request=supabaseClient.from("nom_posts")
+    .select("id,body,post_type,place_name,place_location,category,user_id,created_at")
+    .eq("status","published").order("created_at",{ascending:false}).limit(100);
+  if(category&&category!=="All")request=request.eq("category",category);
+  const {data:posts,error}=await request;
+  if(error)throw error;
+  const term=String(query||"").trim().toLowerCase();
+  const filtered=(posts||[]).filter(post=>!term||
+    [post.body,post.place_name,post.place_location].some(value=>String(value||"").toLowerCase().includes(term)));
+  if(!filtered.length)return [];
+  const ids=filtered.map(post=>post.id);
+  const {data:media,error:mediaError}=await supabaseClient.from("nom_post_media")
+    .select("post_id,storage_path,media_type").in("post_id",ids).order("created_at",{ascending:true});
+  if(mediaError)console.warn("NOM Share media lookup:",mediaError.message);
+  const mediaByPost=new Map();
+  (media||[]).forEach(item=>{
+    const url=supabaseClient.storage.from(NOM_COMMUNITY_BUCKET).getPublicUrl(item.storage_path).data.publicUrl;
+    const group=mediaByPost.get(item.post_id)||{photos:[],videos:[]};
+    if(item.media_type==="image")group.photos.push(url);
+    if(item.media_type==="video")group.videos.push(url);
+    mediaByPost.set(item.post_id,group);
+  });
+  return filtered.map(post=>{
+    const mediaGroup=mediaByPost.get(post.id)||{photos:[],videos:[]};
+    const name=post.place_name||String(post.body||"").trim().slice(0,72)||"NOM community post";
+    return {
+      id:"nompost-"+post.id,source_id:"nompost-"+post.id,name,
+      description:post.body||"Shared with NOM",location:post.place_location||"",
+      category:post.category,image_url:mediaGroup.photos[0]||null,image:mediaGroup.photos[0]||null,
+      video_urls:mediaGroup.videos,community_author:"NOM member",rating:null,price:null
+    };
+  });
+}
+
 let searchDebounce;
 async function searchPlaces(query){
   clearTimeout(searchDebounce);
@@ -975,19 +1011,22 @@ async function searchPlaces(query){
   searchDebounce = setTimeout(async ()=>{
     // Render NOM's own catalogue first; third-party search must not block cards.
     const categoryAtRequest=selectedCategory;
-    const [localResult, communityResult] = await Promise.all([
+    const [localResult, communityResult, shareResult] = await Promise.all([
       loadNomPlaces(value,categoryAtRequest)
         .then(data=>({data,error:null}))
         .catch(error=>({data:[],error})),
       supabaseClient
         ? supabaseClient.from("community_posts").select("id,title,description,location,category,photo_urls,video_urls,user_id,username,display_name").eq("status","published").limit(50)
             .then(result=>result).catch(error=>({data:[],error}))
-        : Promise.resolve({data:[],error:new Error("Supabase client unavailable")})
+        : Promise.resolve({data:[],error:new Error("Supabase client unavailable")}),
+      loadNomShareCategoryCards(categoryAtRequest,value)
+        .then(data=>({data,error:null})).catch(error=>({data:[],error}))
     ]);
 
     if(requestId !== searchRequestId) return;
     if(localResult.error) console.error("NOM catalogue search:",localResult.error.message);
     if(communityResult.error) console.warn("NOM community search:",communityResult.error.message);
+    if(shareResult.error) console.warn("NOM Share category search:",shareResult.error.message);
 
     const localPlaces = Array.isArray(localResult.data) ? localResult.data : [];
     const communityPlaces = (communityResult.data || [])
@@ -1017,7 +1056,7 @@ async function searchPlaces(query){
       return [...merged.values()];
     }
 
-    currentResults = mergePlaceRecords([...communityPlaces,...localPlaces]);
+    currentResults = mergePlaceRecords([...(shareResult.data||[]),...communityPlaces,...localPlaces]);
     places = mergePlaceRecords([...places,...currentResults]);
     renderPlaces(currentResults);
     renderSaved();
@@ -1036,7 +1075,7 @@ async function searchPlaces(query){
       const payload = await response.json();
       if(requestId !== searchRequestId) return;
       const externalPlaces = (payload.places || []).map(place=>({...place,id:place.source_id || place.id,rating:null,price:null}));
-      currentResults = mergePlaceRecords([...externalPlaces,...communityPlaces,...localPlaces]);
+      currentResults = mergePlaceRecords([...externalPlaces,...(shareResult.data||[]),...communityPlaces,...localPlaces]);
       places = mergePlaceRecords([...places,...currentResults]);
       renderPlaces(currentResults);
       renderSaved();
