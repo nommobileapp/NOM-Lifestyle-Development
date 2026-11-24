@@ -1137,9 +1137,16 @@ async function loadInitialNomPlaces(){
     }
   }
 
+  let sharePlaces=[];
+  try{
+    sharePlaces=await loadNomShareCategoryCards("All","");
+  }catch(error){
+    console.warn("NOM initial Share posts:",error.message);
+  }
+
   if(requestId!==searchRequestId)return;
   const merged=new Map();
-  [...communityPlaces,...localPlaces].forEach(place=>{
+  [...sharePlaces,...communityPlaces,...localPlaces].forEach(place=>{
     const key=String(place.source_id||place.id);
     const previous=merged.get(key)||{};
     merged.set(key,{...previous,...place,
