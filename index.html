@@ -245,7 +245,7 @@ hr{border:0;border-top:1px solid var(--border);margin:18px 0}
 .community-upload input,.community-upload textarea,.community-upload select{width:100%;background:#111;color:white;border:1px solid var(--border);border-radius:11px;padding:13px;margin:7px 0 13px}
 .community-upload input[type=file]{padding:11px;font-size:12px}
 .community-post{background:var(--panel);border:1px solid var(--border);border-radius:17px;padding:14px;margin:12px 0;overflow:hidden}
-.community-post .community-post-media{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;object-position:center;border-radius:12px;margin:8px 0;background:#080808}
+.community-post .community-post-media{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;object-position:center;border-radius:12px;margin:8px 0;background:#080808}.community-post .community-post-media,.nom-post-media{cursor:zoom-in}.nom-post-video-frame{position:relative;width:100%;margin:10px 0}.nom-post-video-frame .nom-post-media{margin:0}.nom-post-fullscreen-button{position:absolute;right:9px;top:9px;z-index:2;width:40px;height:40px;border:1px solid #ffffff88;border-radius:50%;background:#111c;color:#fff;font-size:23px;line-height:1;display:grid;place-items:center}
 .community-post .post-meta{font-size:11px;color:var(--lime);margin:9px 0 4px}
 .community-post .post-author{font-size:12px;color:var(--orange)}
 .community-post .post-status{font-size:11px;color:var(--lime);margin-top:8px}
@@ -653,6 +653,7 @@ async function openMemberPortfolio(userId){
 }
 
 let activeNomConversation=null,nomChatChannel=null,nomNotificationChannel=null;
+function openPostMediaFullscreen(element){if(!element)return;const kind=element.dataset.fullscreenKind||"image",url=element.dataset.fullscreenUrl;if(!url)return;openWorkMediaViewer(kind,url);}
 function openWorkMediaViewer(kind,url){
  const box=document.getElementById("workMediaLightbox"),target=document.getElementById("workMediaLightboxContent");if(!box||!url)return;
  target.innerHTML=kind==="video"?'<video controls playsinline autoplay src="'+escapeHTML(url)+'"></video>':kind==="audio"?'<div style="width:min(520px,90vw);padding:24px;background:#1b1b1b;border:1px solid #444;border-radius:16px;text-align:center;color:#f5f5f5"><div style="font-size:42px;color:var(--lime)">♫</div><p>Portfolio audio</p><audio controls autoplay src="'+escapeHTML(url)+'" style="width:100%"></audio></div>':'<img src="'+escapeHTML(url)+'" alt="Full-size portfolio media">';
@@ -1311,8 +1312,8 @@ function communityPostCard(post,own=false){
   nomDetailItems[String(post.id)]={id:post.id,kind:"community",name:post.title,description:post.description,location:post.location,category:post.category,photos,videos,author:post.username?"@"+post.username:(post.display_name||"NOM member")};
   const status="Published on NOM";
   const authorIdentity='<span class="nom-identity-row">'+nomAvatarMarkup(post.avatar_url,post.username||"NOM member",true)+'<span>'+escapeHTML(post.username?"@"+post.username:(post.display_name||"NOM member"))+'</span></span>';
-  const photoPreviews=photos.map(url=>'<img class="community-post-media" src="'+escapeHTML(url)+'" alt="'+escapeHTML(post.title)+'" loading="lazy">').join("");
-  const videoPreviews=videos.map(url=>'<video class="community-post-media" controls playsinline preload="metadata" src="'+escapeHTML(url)+'" onclick="event.stopPropagation()"></video>').join("");
+  const photoPreviews=photos.map(url=>'<img class="community-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(url)+'" onclick="openPostMediaFullscreen(this);event.stopPropagation()" src="'+escapeHTML(url)+'" alt="'+escapeHTML(post.title)+'" loading="lazy">').join("");
+  const videoPreviews=videos.map(url=>'<div class="nom-post-video-frame"><video class="community-post-media" controls playsinline preload="metadata" src="'+escapeHTML(url)+'" onclick="event.stopPropagation()"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(url)+'" onclick="openPostMediaFullscreen(this);event.stopPropagation()">⛶</button></div>').join("");
   const mediaCount=photos.length+videos.length;
   return '<article class="community-post" role="button" tabindex="0" data-detail-id="'+escapeHTML(String(post.id))+'" onclick="openPlaceDetail(this.dataset.detailId)" onkeydown="if(event.key===\'Enter\'){openPlaceDetail(this.dataset.detailId)}">'+photoPreviews+videoPreviews+
     '<div class="post-meta">'+escapeHTML(post.category||"DISCOVERY")+' · '+escapeHTML(post.location||"")+'</div>'+
@@ -1381,8 +1382,8 @@ async function loadNomPostsFeed(){
       const profile=profileMap[post.user_id]||{},username=profile.username||profile.display_name||"NOM member";
       const avatar=nomAvatarMarkup(profile.avatar_url||"",username,true);
       const mediaHtml=(mediaMap[post.id]||[]).map(item=>{
-        if(item.media_type==="image")return '<img class="nom-post-media" src="'+escapeHTML(item.url)+'" alt="Photo shared on NOM" loading="lazy">';
-        if(item.media_type==="video")return '<video class="nom-post-media" controls playsinline preload="metadata" src="'+escapeHTML(item.url)+'"></video>';
+        if(item.media_type==="image")return '<img class="nom-post-media" data-fullscreen-kind="image" data-fullscreen-url="'+escapeHTML(item.url)+'" onclick="openPostMediaFullscreen(this)" src="'+escapeHTML(item.url)+'" alt="Photo shared on NOM" loading="lazy">';
+        if(item.media_type==="video")return '<div class="nom-post-video-frame"><video class="nom-post-media" controls playsinline preload="metadata" src="'+escapeHTML(item.url)+'"></video><button class="nom-post-fullscreen-button" type="button" aria-label="View video fullscreen" data-fullscreen-kind="video" data-fullscreen-url="'+escapeHTML(item.url)+'" onclick="openPostMediaFullscreen(this)">⛶</button></div>';
         if(item.media_type==="audio")return '<audio class="nom-post-audio" controls preload="metadata" src="'+escapeHTML(item.url)+'"></audio>';
         return "";
       }).join("");
