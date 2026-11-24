@@ -1046,7 +1046,7 @@ let nomSearchTimer=null,nomSearchRequestId=0,nomSearchCategory="all",nomSearchSo
 let nomSearchData={places:[],members:[],community:[],work:[]};
 let nomSearchExternalMessage="";
 function setNomSearchCategory(category){nomSearchCategory=category;renderNOMSearchResults();}
-function nomSearchSafeTerm(value){return String(value||"").trim().replace(/[%,()\\\\'"]/g," ").replace(/\\s+/g," ").slice(0,80);}
+function nomSearchSafeTerm(value){return String(value||"").trim().replace(/[%,()\\\\'"]/g," ").replace(/\s+/g," ").slice(0,80);}
 function nomSearchTabsMarkup(){
  const counts={all:nomSearchData.places.length+nomSearchData.members.length+nomSearchData.community.length+nomSearchData.work.length,places:nomSearchData.places.length,members:nomSearchData.members.length,community:nomSearchData.community.length,work:nomSearchData.work.length};
  return [["all","All"],["places","Places"],["members","Members"],["community","Community"],["work","Work"]].map(([key,label])=>'<button type="button" class="nom-search-tab '+(nomSearchCategory===key?"active":"")+'" onclick="setNomSearchCategory(\''+key+'\')">'+label+' · '+counts[key]+'</button>').join("");
@@ -1776,6 +1776,29 @@ function nomTripDistanceKm(a,b){
  const h=Math.sin(dLat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dLng/2)**2;
  return 6371*2*Math.asin(Math.sqrt(h));
 }
+function nomTripAreaTokens(value){
+ return [...new Set(String(value||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(word=>word.length>=4&&!["near","area","street","road","jalan","bali","indonesia"].includes(word)))];
+}
+function nomTripLocationOverlap(a,b){
+ const left=nomTripAreaTokens(a),right=new Set(nomTripAreaTokens(b));
+ return left.filter(word=>right.has(word)).length;
+}
+function nomTripScheduleForPlace(place,trip,items,clusterIndex,days){
+ const start=trip.start_date?new Date(trip.start_date+"T12:00:00"):null;
+ const dayRows=Array.from({length:days},(_,offset)=>{
+  const date=start?(()=>{const d=new Date(start);d.setDate(d.getDate()+offset);return d.toISOString().slice(0,10);})():null;
+  const rows=(items||[]).filter(item=>date&&item.day_date===date);
+  const overlap=rows.reduce((score,item)=>score+nomTripLocationOverlap(place.address,item.location),0);
+  return {offset,date,rows,overlap};
+ });
+ dayRows.sort((a,b)=>b.overlap-a.overlap||a.rows.length-b.rows.length||Math.abs(a.offset-(clusterIndex%days))-Math.abs(b.offset-(clusterIndex%days)));
+ const chosen=dayRows[0]||{offset:0,date:null,rows:[],overlap:0};
+ const slots=["09:00","10:30","12:00","13:30","15:00","16:30","18:00"];
+ const occupied=chosen.rows.map(item=>String(item.start_time||"").slice(0,5)).filter(v=>/^\d{2}:\d{2}$/.test(v)).map(v=>{const [h,m]=v.split(":").map(Number);return h*60+m;});
+ const available=slots.find(slot=>{const [h,m]=slot.split(":").map(Number),mins=h*60+m;return occupied.every(existing=>Math.abs(existing-mins)>=90);})||"";
+ const nearby=chosen.rows.find(item=>nomTripLocationOverlap(place.address,item.location)>0);
+ return {day_offset:chosen.offset,date:chosen.date,time:available,nearby_title:nearby?.title||"",nearby_location:nearby?.location||"",overlap:chosen.overlap};
+}
 function buildNomSmartSuggestions(trip,places,existingItems){
  const days=trip.start_date&&trip.end_date?Math.max(1,Math.min(21,Math.floor((Date.parse(trip.end_date)-Date.parse(trip.start_date))/86400000)+1)):1;
  const existing=new Set((existingItems||[]).map(x=>String(x.title||"").trim().toLowerCase()).filter(Boolean));
@@ -1803,11 +1826,16 @@ function buildNomSmartSuggestions(trip,places,existingItems){
  clusters.sort((a,b)=>b.length-a.length);
  const output=[];
  clusters.forEach((cluster,clusterIndex)=>{
-  const dayOffset=clusterIndex%days;
   cluster.forEach((place,index)=>{
    if(output.length>=24)return;
    const hasCoords=place.latitude!==null&&place.longitude!==null,grouped=cluster.length>1;
-   output.push({place_key:place.place_key,day_offset:dayOffset,time:"",reason:grouped?"Grouped with other saved places in the same nearby area.":"Added as a saved stop in your trip.",notes:index===0?"Check the best visit time and travel arrangements before you go.":"",route_note:hasCoords?(grouped?"Nearby grouping uses approximate straight-line coordinates, not road distance or travel time.":"Coordinates are available; check the road route before setting off."):(place.address?"Grouped by matching saved address text only; confirm the exact location.":"No location data is available, so this stop is scheduled separately.")});
+   const schedule=nomTripScheduleForPlace(place,trip,existingItems,clusterIndex,days);
+   const dayLabel=schedule.date?"day already containing a similar area":"the least busy trip day";
+   const reason=schedule.nearby_title
+    ?"Scheduled near "+schedule.nearby_title+" because the saved location appears to share the same area."
+    :"Suggested for "+dayLabel+" to balance the existing itinerary.";
+   const notes=[index===0?"Check opening hours and travel arrangements before visiting.":"Grouped with nearby saved places to reduce unnecessary backtracking.",schedule.time?"Suggested time leaves at least 90 minutes from other timed itinerary items.":"No clear time gap was available; choose a time manually before saving."].join(" ");
+   output.push({place_key:place.place_key,day_offset:schedule.day_offset,time:schedule.time,reason,notes,nearby_title:schedule.nearby_title,route_note:hasCoords?(grouped?"Nearby grouping uses approximate straight-line coordinates, not road distance or travel time.":"Coordinates are available; check the road route before setting off."):(place.address?"Area matching is based on saved address text; confirm the exact location.":"No location data is available, so confirm the location manually.")});
   });
  });
  return output;
@@ -1826,7 +1854,7 @@ async function generateNomTripSuggestions(tripId){
   window.nomTripSuggestions=suggestions.map(x=>({...x,trip_id:tripId}));
   results.innerHTML=suggestions.map((x,i)=>{
    const place=placesForAI.find(p=>p.place_key===String(x.place_key));if(!place)return "";
-   return '<article class="feed-card" style="margin:9px 0;padding:13px"><div class="eyebrow">Day '+(Number(x.day_offset)+1)+'</div><strong>'+escapeHTML(place.name)+'</strong>'+(place.address?'<p class="small">'+escapeHTML(place.address)+'</p>':'')+'<p style="margin:7px 0">'+escapeHTML(x.reason)+'</p><p class="small">'+escapeHTML(x.route_note)+'</p><button class="secondary" type="button" onclick="useNomTripSuggestion('+i+')">Use suggestion</button></article>';
+   return '<article class="feed-card" style="margin:9px 0;padding:13px"><div class="eyebrow">Day '+(Number(x.day_offset)+1)+(x.time?' · '+escapeHTML(x.time):' · Choose a time')+'</div><strong>'+escapeHTML(place.name)+'</strong>'+(place.address?'<p class="small">'+escapeHTML(place.address)+'</p>':'')+'<p style="margin:7px 0">'+escapeHTML(x.reason)+'</p><p class="small">'+escapeHTML(x.route_note)+'</p><button class="secondary" type="button" onclick="useNomTripSuggestion('+i+')">Use suggestion</button></article>';
   }).join("");
   status.textContent="Free Smart Planner organised your saved places. Review each suggestion, then edit it in your itinerary form.";
  }catch(error){console.warn("NOM Smart Planner:",error);status.textContent=error?.message||"Smart Planner is temporarily unavailable.";}
@@ -1844,7 +1872,7 @@ function renderNomTripDetail(trip){
  const panel=document.getElementById("tripDetailPanel"),groups={};nomTripItemsCache.forEach(x=>{const k=x.day_date||"unscheduled";(groups[k]||(groups[k]=[])).push(x);});
  const keys=Object.keys(groups).sort((a,b)=>a==="unscheduled"?1:b==="unscheduled"?-1:a.localeCompare(b));
  const list=keys.length?keys.map(day=>'<div class="feed-card"><h3>'+escapeHTML(day==="unscheduled"?"Unscheduled":new Date(day+"T00:00:00").toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"}))+'</h3>'+groups[day].map(x=>'<div style="padding:10px 0;border-top:1px solid var(--border)"><div class="place-meta">'+escapeHTML(x.item_type.toUpperCase())+(x.start_time?' · '+escapeHTML(x.start_time.slice(0,5)):'')+'</div><strong>'+escapeHTML(x.title)+'</strong>'+(x.location?'<p>'+escapeHTML(x.location)+'</p>':'')+(x.notes?'<p>'+escapeHTML(x.notes)+'</p>':'')+(x.external_url?'<p><a href="'+escapeHTML(x.external_url)+'" target="_blank" rel="noopener" style="color:var(--orange)">Open booking / details ↗</a></p>':'')+'<button class="text-button" onclick="deleteNomTripItem(\''+x.id+'\')">Remove item</button></div>').join("")+'</div>').join(""):'<p class="small">Your itinerary is empty. Add a flight, stay, activity or place below.</p>';
- panel.innerHTML='<div class="panel" style="border-color:#493020"><button class="text-button" onclick="activeNomTripId=null;renderTrips();document.getElementById(\'tripDetailPanel\').classList.add(\'hidden\')">← Back to trips</button><div class="eyebrow">YOUR PRIVATE JOURNEY</div><h2 style="margin:8px 0">'+escapeHTML(trip.destination)+'</h2><p>'+escapeHTML(tripDateLabel(trip.start_date,trip.end_date))+'</p>'+(trip.budget_amount!==null?'<p class="place-meta">Planned budget · '+escapeHTML(tripMoney(trip.budget_amount,trip.budget_currency))+'</p>':'')+'</div><h2>Day-by-day itinerary</h2>'+ '<div class="feed-card" style="border-color:#493020"><div class="eyebrow">NOM SMART PLANNER · FREE</div><h3 style="margin:7px 0">Plan a smoother route</h3><p class="small">NOM groups your saved places by nearby coordinates or matching area details. No paid AI service or API credits are used. Distances are approximate straight-line proximity, not road routes or travel times.</p><button class="primary" type="button" id="tripAiButton" onclick="generateNomTripSuggestions(&quot;'+trip.id+'&quot;)">✦ Build my free itinerary</button><div class="message" id="tripAiMessage" aria-live="polite"></div><div id="tripAiSuggestions"></div></div>'+list+'<div class="form-card"><h3 style="margin-top:0">＋ Add to itinerary</h3><label for="tripItemTitle">What would you like to add?</label><input id="tripItemTitle" maxlength="160" placeholder="e.g. Uluwatu Beach or hotel check-in"><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><div><label for="tripItemType">Type</label><select id="tripItemType" style="width:100%;padding:13px;background:#111;color:white;border:1px solid var(--border);border-radius:11px;margin:7px 0 13px"><option value="place">Place</option><option value="flight">Flight</option><option value="stay">Accommodation</option><option value="activity">Activity</option><option value="meal">Food / meal</option><option value="transport">Transport</option><option value="note">Note</option></select></div><div><label for="tripItemDate">Day</label><input id="tripItemDate" type="date"></div></div><label for="tripItemLocation">Location</label><input id="tripItemLocation" maxlength="200" placeholder="Area or address"><label for="tripItemTime">Start time</label><input id="tripItemTime" type="time"><label for="tripItemCost">Estimated cost (optional)</label><input id="tripItemCost" type="number" min="0" step="0.01" placeholder="Amount"><label for="tripItemUrl">External booking / details link</label><input id="tripItemUrl" type="url" placeholder="https://…"><label for="tripItemNotes">Notes</label><textarea id="tripItemNotes" rows="2" maxlength="1500" placeholder="Details or reminders"></textarea><button class="primary" onclick="saveNomTripItem(\''+trip.id+'\')">Add to itinerary</button><div class="message" id="tripItemMessage"></div></div>';
+ panel.innerHTML='<div class="panel" style="border-color:#493020"><button class="text-button" onclick="activeNomTripId=null;renderTrips();document.getElementById(\'tripDetailPanel\').classList.add(\'hidden\')">← Back to trips</button><div class="eyebrow">YOUR PRIVATE JOURNEY</div><h2 style="margin:8px 0">'+escapeHTML(trip.destination)+'</h2><p>'+escapeHTML(tripDateLabel(trip.start_date,trip.end_date))+'</p>'+(trip.budget_amount!==null?'<p class="place-meta">Planned budget · '+escapeHTML(tripMoney(trip.budget_amount,trip.budget_currency))+'</p>':'')+'</div><h2>Day-by-day itinerary</h2>'+ '<div class="feed-card" style="border-color:#493020"><div class="eyebrow">NOM SMART PLANNER · FREE</div><h3 style="margin:7px 0">Plan a smoother route</h3><p class="small">NOM checks your existing days, locations and timed activities before suggesting a slot. It avoids close time conflicts, prefers days with matching nearby areas, and leaves existing plans untouched. Saved-place distances are approximate straight-line proximity, not road routes or travel times.</p><button class="primary" type="button" id="tripAiButton" onclick="generateNomTripSuggestions(&quot;'+trip.id+'&quot;)">✦ Build my free itinerary</button><div class="message" id="tripAiMessage" aria-live="polite"></div><div id="tripAiSuggestions"></div></div>'+list+'<div class="form-card"><h3 style="margin-top:0">＋ Add to itinerary</h3><label for="tripItemTitle">What would you like to add?</label><input id="tripItemTitle" maxlength="160" placeholder="e.g. Uluwatu Beach or hotel check-in"><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><div><label for="tripItemType">Type</label><select id="tripItemType" style="width:100%;padding:13px;background:#111;color:white;border:1px solid var(--border);border-radius:11px;margin:7px 0 13px"><option value="place">Place</option><option value="flight">Flight</option><option value="stay">Accommodation</option><option value="activity">Activity</option><option value="meal">Food / meal</option><option value="transport">Transport</option><option value="note">Note</option></select></div><div><label for="tripItemDate">Day</label><input id="tripItemDate" type="date"></div></div><label for="tripItemLocation">Location</label><input id="tripItemLocation" maxlength="200" placeholder="Area or address"><label for="tripItemTime">Start time</label><input id="tripItemTime" type="time"><label for="tripItemCost">Estimated cost (optional)</label><input id="tripItemCost" type="number" min="0" step="0.01" placeholder="Amount"><label for="tripItemUrl">External booking / details link</label><input id="tripItemUrl" type="url" placeholder="https://…"><label for="tripItemNotes">Notes</label><textarea id="tripItemNotes" rows="2" maxlength="1500" placeholder="Details or reminders"></textarea><button class="primary" onclick="saveNomTripItem(\''+trip.id+'\')">Add to itinerary</button><div class="message" id="tripItemMessage"></div></div>';
 }
 async function saveNomTripItem(tripId){
  if(!currentUser||activeNomTripId!==tripId)return;const msg=document.getElementById("tripItemMessage"),title=document.getElementById("tripItemTitle").value.trim(),type=document.getElementById("tripItemType").value,day=document.getElementById("tripItemDate").value||null,location=document.getElementById("tripItemLocation").value.trim(),time=document.getElementById("tripItemTime").value||null,cv=document.getElementById("tripItemCost").value,cost=cv===""?null:Number(cv),url=document.getElementById("tripItemUrl").value.trim(),notes=document.getElementById("tripItemNotes").value.trim();
