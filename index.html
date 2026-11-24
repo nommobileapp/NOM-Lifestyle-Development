@@ -1897,7 +1897,7 @@ async function saveNomTripBudget(tripId){
  trip.budget_amount=budget;trip.budget_currency=currency;nomTripExpensesCache=nomTripExpensesCache.map(x=>({...x}));renderNomTripDetail(trip);
 }
 async function saveNomTripExpense(tripId){
- if(!currentUser||activeNomTripId!==tripId)return;const msg=document.getElementById("tripExpenseMessage"),description=document.getElementById("tripExpenseDescription").value.trim(),category=document.getElementById("tripExpenseCategory").value,amount=Number(document.getElementById("tripExpenseAmount").value),date=document.getElementById("tripExpenseDate").value||new Date().toLocaleDateString("en-CA"),trip=nomTripsCache.find(t=>t.id===tripId);
+ if(!currentUser||activeNomTripId!==tripId)return;const msg=document.getElementById("tripExpenseMessage"),description=document.getElementById("tripExpenseDescription").value.trim(),category=document.getElementById("tripExpenseCategory").value,amount=Number(document.getElementById("tripExpenseAmount").value),date=document.getElementById("tripExpenseDate").value||(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})(),trip=nomTripsCache.find(t=>t.id===tripId);
  if(!trip||!description){msg.textContent="Please describe the expense.";return;}
  if(!Number.isFinite(amount)||amount<=0){msg.textContent="Enter an amount greater than zero.";return;}
  const {data,error}=await supabaseClient.from("trip_expenses").insert({trip_id:tripId,owner_id:currentUser.id,category,description,amount,currency_code:trip.budget_currency||"USD",expense_date:date}).select("id,trip_id,owner_id,category,description,amount,currency_code,expense_date,created_at").single();
@@ -2204,7 +2204,7 @@ async function logout(){
 
     currentUser = null;
     resetSavedPlacesForGuest();
-    nomTripsCache=[];activeNomTripId=null;nomTripItemsCache=[];renderTrips();
+    nomTripsCache=[];activeNomTripId=null;nomTripItemsCache=[];nomTripExpensesCache=[];nomTripExpensesError="";renderTrips();
     updateProfile();
     message.textContent = "You have logged out.";
   }catch(error){
