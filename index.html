@@ -1030,7 +1030,7 @@ async function searchPlaces(query){
 
     const localPlaces = Array.isArray(localResult.data) ? localResult.data : [];
     const communityPlaces = (communityResult.data || [])
-      .filter(post=>(selectedCategory === "All" || post.category === selectedCategory) &&
+      .filter(post=>(categoryAtRequest === "All" || post.category === categoryAtRequest) &&
         (!value || [post.title,post.description,post.location].some(field=>String(field||"").toLowerCase().includes(value.toLowerCase()))))
       .map(post=>({
         id:"community-" + post.id,source_id:"community-" + post.id,name:post.title,
@@ -1067,23 +1067,34 @@ async function searchPlaces(query){
       : "Loading live discoveries...";
 
     try{
-      const liveParams = new URLSearchParams({q:value,limit:"30"});
-      if(categoryAtRequest && categoryAtRequest!=="All")liveParams.set("category",categoryAtRequest);
-      const url = SUPABASE_URL + "/functions/v1/nom-place-search?" + liveParams.toString();
-      const response = await fetch(url,{headers:{apikey:SUPABASE_KEY}});
-      if(!response.ok) throw new Error("External place search unavailable");
-      const payload = await response.json();
-      if(requestId !== searchRequestId) return;
-      const externalPlaces = (payload.places || []).map(place=>({...place,id:place.source_id || place.id,rating:null,price:null}));
+      /* Community and Culture & Lifestyle are NOM content categories, not
+         geographic place-search categories. Do not let external nature/place
+         results leak into those Discovery filters. */
+      const usesExternalPlaceSearch = !["Community","Culture & Lifestyle"].includes(categoryAtRequest);
+      let externalPlaces = [];
+      if(usesExternalPlaceSearch){
+        const liveParams = new URLSearchParams({q:value,limit:"30"});
+        if(categoryAtRequest && categoryAtRequest!=="All")liveParams.set("category",categoryAtRequest);
+        const url = SUPABASE_URL + "/functions/v1/nom-place-search?" + liveParams.toString();
+        const response = await fetch(url,{headers:{apikey:SUPABASE_KEY}});
+        if(!response.ok) throw new Error("External place search unavailable");
+        const payload = await response.json();
+        if(requestId !== searchRequestId) return;
+        externalPlaces = (payload.places || []).map(place=>({...place,id:place.source_id || place.id,rating:null,price:null}));
+      }
       currentResults = mergePlaceRecords([...externalPlaces,...(shareResult.data||[]),...communityPlaces,...localPlaces]);
       places = mergePlaceRecords([...places,...currentResults]);
       renderPlaces(currentResults);
       renderSaved();
-      if(message) message.textContent = externalPlaces.length
-        ? "Live discoveries from Geoapify and OpenStreetMap, alongside the NOM catalogue."
-        : localPlaces.length
-          ? "Showing places saved in the NOM catalogue."
-          : "No matches yet. Try another keyword or category.";
+      if(message) message.textContent = categoryAtRequest === "Community"
+        ? "Showing NOM community posts and member discoveries."
+        : categoryAtRequest === "Culture & Lifestyle"
+          ? "Showing NOM culture and lifestyle discoveries."
+          : externalPlaces.length
+            ? "Live discoveries from Geoapify and OpenStreetMap, alongside the NOM catalogue."
+            : localPlaces.length
+              ? "Showing places saved in the NOM catalogue."
+              : "No matches yet. Try another keyword or category.";
     }catch(error){
       console.warn("NOM external place search:",error.message);
       if(requestId === searchRequestId && message && !localPlaces.length){
